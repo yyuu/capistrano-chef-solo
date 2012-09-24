@@ -57,6 +57,7 @@ module Capistrano
           task(:update) {
             update_cookbook
             update_config
+            update_attributes
             invoke
           }
 
@@ -96,10 +97,12 @@ module Capistrano
               cookbook_path #{File.join(chef_solo_path, 'cookbooks').dump}
             EOS
           }
-          _cset(:chef_solo_attributes, {})
           task(:update_config) {
             put(chef_solo_config, File.join(chef_solo_path, 'config', 'solo.rb'))
+          }
 
+          _cset(:chef_solo_attributes, {})
+          task(:update_attributes) {
             attributes = chef_solo_attributes.merge('run_list' => fetch(:chef_solo_run_list, []))
             put(attributes.to_json, File.join(chef_solo_path, 'config', 'solo.json'))
           }
