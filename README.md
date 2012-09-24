@@ -41,8 +41,9 @@ Following options are available to manage your `chef-solo`.
  * `:chef_solo_user` - special user to invoke `chef-solo`. use `user` by default.
  * `:chef_solo_ssh_options` - special ssh options for `chef_solo_user`. use `ssh_options` by default.
  * `:chef_solo_ruby_version` - ruby version to launch `chef-solo`.
- * `:chef_solo_cookbook_repository` - the URL of your cookbook repository.
+ * `:chef_solo_cookbook_repository` - the URL of your cookbook repository. use `repository` by default.
  * `:chef_solo_cookbook_revision` - the `branch` in the repository.
+ * `:chef_solo_cookbook_subdir` - the path to the `cookbooks` directory in the repository. use `config/cookbooks` by default.
  * `:chef_solo_attributes` - the `attributes` to apply to `chef-solo`.
  * `:chef_solo_run_list` - the `run_list` to apply to `chef-solo`.
 

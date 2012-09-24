@@ -62,10 +62,17 @@ module Capistrano
           }
 
           _cset(:chef_solo_cookbook_repository) {
-            abort("chef_solo_cookbook_repository not set")
+            repository
           }
           _cset(:chef_solo_cookbook_revision, 'HEAD')
           _cset(:chef_solo_cookbooks_exclude, [])
+          _cset(:chef_solo_cookbooks_subdir) {
+            if chef_solo_cookbook_repository == repository
+              'config/cookbooks'
+            else
+              nil
+            end
+          }
           task(:update_cookbook) { # TODO: refactor
             git = fetch(:chef_solo_git, 'git')
             tar = fetch(:chef_solo_tar, 'tar')
@@ -76,7 +83,7 @@ module Capistrano
             remote_filename = File.join('/tmp', File.basename(filename))
 
             repository_cache = File.join(copy_dir, 'cached-copy')
-            if fetch(:chef_solo_cookbook_subdir, nil)
+            if chef_solo_cookbook_subdir
               repository_cache_subdir = File.join(repository_cache, chef_solo_cookbook_subdir)
             else
               repository_cache_subdir = repository_cache
