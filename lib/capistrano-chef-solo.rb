@@ -65,7 +65,8 @@ module Capistrano
             abort("chef_solo_cookbook_repository not set")
           }
           _cset(:chef_solo_cookbook_revision, 'HEAD')
-          task(:update_cookbook) {
+          _cset(:chef_solo_cookbooks_exclude, [])
+          task(:update_cookbook) { # TODO: refactor
             git = fetch(:chef_solo_git, 'git')
             tar = fetch(:chef_solo_tar, 'tar')
             copy_dir = Dir.mktmpdir()
@@ -74,10 +75,23 @@ module Capistrano
             remote_destination = File.join(chef_solo_path, 'cookbooks')
             remote_filename = File.join('/tmp', File.basename(filename))
 
+            repository_cache = File.join(copy_dir, 'cached-copy')
+            if fetch(:chef_solo_cookbook_subdir, nil)
+              repository_cache_subdir = File.join(repository_cache, chef_solo_cookbook_subdir)
+            else
+              repository_cache_subdir = repository_cache
+            end
+
             begin
               checkout = []
-              checkout << "#{git} clone -q #{chef_solo_cookbook_repository} #{destination}"
-              checkout << "cd #{destination} && #{git} checkout -q -b deploy #{chef_solo_cookbook_revision}"
+              checkout << "#{git} clone -q #{chef_solo_cookbook_repository} #{repository_cache}"
+              checkout << "cd #{repository_cache} && #{git} checkout -q -b deploy #{chef_solo_cookbook_revision}"
+              if chef_solo_cookbooks_exclude.empty?
+                checkout << "cp -RPp #{repository_cache_subdir} #{destination}"
+              else
+                exclusions = chef_solo_cookbooks_exclude.map { |e| "--exclude=\"#{e}\"" }.join(' ')
+                checkout << "rsync -lrpt #{exclusions} #{repository_cache_subdir} #{destination}"
+              end
               run_locally(checkout.join(' && '))
 
               copy = []
