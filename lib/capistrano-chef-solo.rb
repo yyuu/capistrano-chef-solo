@@ -1,5 +1,7 @@
-require "capistrano-chef-solo/version"
+require 'capistrano-chef-solo/version'
 require 'capistrano-rbenv'
+require 'capistrano/configuration'
+require 'capistrano/recipes/deploy/scm'
 require 'json'
 require 'tmpdir'
 
@@ -55,62 +57,101 @@ module Capistrano
           }
  
           task(:update) {
-            update_cookbook
+            update_cookbooks
             update_config
             update_attributes
             invoke
           }
 
-          _cset(:chef_solo_cookbook_repository) {
-            repository
+          task(:update_cookbooks) {
+            tmpdir = Dir.mktmpdir()
+            remote_tmpdir = Dir.mktmpdir()
+            destination = File.join(tmpdir, 'cookbooks')
+            remote_destination = File.join(chef_solo_path, 'cookbooks')
+            filename = File.join(tmpdir, 'cookbooks.tar.gz')
+            remote_filename = File.join(remote_tmpdir, 'cookbooks.tar.gz')
+            begin
+              bundle_cookbooks(filename, destination)
+              run("mkdir -p #{remote_tmpdir}")
+              distribute_cookbooks(filename, remote_filename, remote_destination)
+            ensure
+              run("rm -f #{remote_tmpdir}")
+              run_locally("rm -rf #{tmpdir}")
+            end
+          }
+
+          _cset(:chef_solo_cookbook_repository) { abort("chef_solo_cookbook_repository not set") }
+          _cset(:chef_solo_cookbooks_repository) {
+            logger.info("WARNING: `chef_solo_cookbook_repository' has been deprecated. use `chef_solo_cookbooks_repository' instead.")
+            chef_solo_cookbook_repository
           }
           _cset(:chef_solo_cookbook_revision, 'HEAD')
-          _cset(:chef_solo_cookbooks_exclude, [])
+          _cset(:chef_solo_cookbooks_revision) {
+            logger.info("WARNING: `chef_solo_cookbook_revision' has been deprecated. use `chef_solo_cookbooks_revision' instead.")
+            chef_solo_cookbook_revision
+          }
+          _cset(:chef_solo_cookbook_subdir, nil)
           _cset(:chef_solo_cookbooks_subdir) {
-            if chef_solo_cookbook_repository == repository
-              'config/cookbooks'
-            else
-              nil
-            end
+            logger.info("WARNING: `chef_solo_cookbook_subdir' has been deprecated. use `chef_solo_cookbooks_subdir' instead.")
+            chef_solo_cookbook_subdir
           }
-          task(:update_cookbook) { # TODO: refactor
-            git = fetch(:chef_solo_git, 'git')
-            tar = fetch(:chef_solo_tar, 'tar')
-            copy_dir = Dir.mktmpdir()
-            destination = File.join(copy_dir, 'cookbooks')
-            filename = "#{destination}.tar.gz"
-            remote_destination = File.join(chef_solo_path, 'cookbooks')
-            remote_filename = File.join('/tmp', File.basename(filename))
+          _cset(:chef_solo_cookbooks_exclude, [])
 
-            repository_cache = File.join(copy_dir, 'cached-copy')
-            if chef_solo_cookbook_subdir
-              repository_cache_subdir = File.join(repository_cache, chef_solo_cookbook_subdir)
-            else
-              repository_cache_subdir = repository_cache
-            end
+          # special variable to set multiple cookbooks repositories.
+          # by default, it will build from :chef_solo_cookbooks_* variables.
+          _cset(:chef_solo_cookbooks) {
+            path = URI.parse(chef_solo_cookbooks_repository).path
+            name = File.basename(path, File.extname(path))
+            {
+              name => {
+                :repository => chef_solo_cookbooks_repository,
+                :revision => chef_solo_cookbooks_revision,
+                :cookbooks => chef_solo_cookbooks_subdir,
+                :cookbooks_exclude => chef_solo_cookbooks_exclude,
+              }
+            }
+          }
 
-            begin
-              checkout = []
-              checkout << "#{git} clone -q #{chef_solo_cookbook_repository} #{repository_cache}"
-              checkout << "cd #{repository_cache} && #{git} checkout -q -b deploy #{chef_solo_cookbook_revision}"
-              if chef_solo_cookbooks_exclude.empty?
-                checkout << "cp -RPp #{repository_cache_subdir} #{destination}"
+          _cset(:chef_solo_configuration, configuration)
+          _cset(:chef_solo_repository_cache) { File.expand_path('./tmp/cookbooks-cache') }
+          def bundle_cookbooks(filename, destination)
+            dirs = [ File.dirname(filename), destination ].uniq
+            run_locally("mkdir -p #{dirs.join(' ')}")
+            chef_solo_cookbooks.each do |name, options|
+              configuration = Capistrano::Configuration.new()
+              chef_solo_configuration.variables.merge(options).each { |key, val|
+                configuration.set(key, val)
+              }
+              # refreshing just :source, :revision and :real_revision is enough?
+              configuration.set(:source) { Capistrano::Deploy::SCM.new(configuration[:scm], configuration) }
+              configuration.set(:revision) { configuration[:source].head }
+              configuration.set(:real_revision) {
+                configuration[:source].local.query_revision(configuration[:revision]) { |cmd|
+                  with_env("LC_ALL", "C") { run_locally(cmd) }
+                }
+              }
+              repository_cache = File.join(chef_solo_repository_cache, name)
+              if File.exist?(repository_cache)
+                run_locally(configuration[:source].sync(configuration[:real_revision], repository_cache))
               else
-                exclusions = chef_solo_cookbooks_exclude.map { |e| "--exclude=\"#{e}\"" }.join(' ')
-                checkout << "rsync -lrpt #{exclusions} #{repository_cache_subdir} #{destination}"
+                run_locally(configuration[:source].checkout(configuration[:real_revision], repository_cache))
               end
-              run_locally(checkout.join(' && '))
 
-              copy = []
-              copy << "cd #{File.dirname(destination)} && #{tar} chzf #{filename}  #{File.basename(destination)}"
-              run_locally(copy.join(' && '))
-
-              upload(filename, remote_filename)
-              run("cd #{File.dirname(remote_destination)} && #{tar} xzf #{remote_filename} && rm -f #{remote_filename}")
-            ensure
-              run_locally("rm -rf #{copy_dir}")
+              cookbooks = [ options.fetch(:cookbooks, '/') ].flatten
+              execute = cookbooks.map { |c|
+                repository_cache_subdir = File.join(repository_cache, c)
+                exclusions = options.fetch(:cookbooks_exclude, []).map { |e| "--exclude=\"#{e}\"" }.join(' ')
+                "rsync -lrpt #{exclusions} #{repository_cache_subdir}/ #{destination}"
+              }
+              run_locally(execute.join(' && '))
             end
-          }
+            run_locally("cd #{File.dirname(destination)} && tar chzf #{filename} #{File.basename(destination)}")
+          end
+
+          def distribute_cookbooks(filename, remote_filename, remote_destination)
+            upload(filename, remote_filename)
+            run("cd #{File.dirname(remote_cookbooks)} && tar xzf #{remote_filename}")
+          end
 
           _cset(:chef_solo_config) {
             (<<-EOS).gsub(/^\s*/, '')
