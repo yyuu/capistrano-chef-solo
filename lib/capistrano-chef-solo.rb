@@ -4,6 +4,7 @@ require 'capistrano/configuration'
 require 'capistrano/recipes/deploy/scm'
 require 'json'
 require 'tmpdir'
+require 'uri'
 
 module Capistrano
   module ChefSolo
@@ -75,7 +76,7 @@ module Capistrano
               run("mkdir -p #{remote_tmpdir}")
               distribute_cookbooks(filename, remote_filename, remote_destination)
             ensure
-              run("rm -f #{remote_tmpdir}")
+              run("rm -rf #{remote_tmpdir}")
               run_locally("rm -rf #{tmpdir}")
             end
           }
@@ -90,7 +91,7 @@ module Capistrano
             logger.info("WARNING: `chef_solo_cookbook_revision' has been deprecated. use `chef_solo_cookbooks_revision' instead.")
             chef_solo_cookbook_revision
           }
-          _cset(:chef_solo_cookbook_subdir, nil)
+          _cset(:chef_solo_cookbook_subdir, '/')
           _cset(:chef_solo_cookbooks_subdir) {
             logger.info("WARNING: `chef_solo_cookbook_subdir' has been deprecated. use `chef_solo_cookbooks_subdir' instead.")
             chef_solo_cookbook_subdir
@@ -100,8 +101,7 @@ module Capistrano
           # special variable to set multiple cookbooks repositories.
           # by default, it will build from :chef_solo_cookbooks_* variables.
           _cset(:chef_solo_cookbooks) {
-            path = URI.parse(chef_solo_cookbooks_repository).path
-            name = File.basename(path, File.extname(path))
+            name = File.basename(chef_solo_cookbooks_repository, File.extname(chef_solo_cookbooks_repository))
             {
               name => {
                 :repository => chef_solo_cookbooks_repository,
@@ -137,7 +137,7 @@ module Capistrano
                 run_locally(configuration[:source].checkout(configuration[:real_revision], repository_cache))
               end
 
-              cookbooks = [ options.fetch(:cookbooks, '/') ].flatten
+              cookbooks = [ options.fetch(:cookbooks, '/') ].flatten.compact
               execute = cookbooks.map { |c|
                 repository_cache_subdir = File.join(repository_cache, c)
                 exclusions = options.fetch(:cookbooks_exclude, []).map { |e| "--exclude=\"#{e}\"" }.join(' ')
@@ -150,7 +150,7 @@ module Capistrano
 
           def distribute_cookbooks(filename, remote_filename, remote_destination)
             upload(filename, remote_filename)
-            run("cd #{File.dirname(remote_cookbooks)} && tar xzf #{remote_filename}")
+            run("cd #{File.dirname(remote_destination)} && tar xzf #{remote_filename}")
           end
 
           _cset(:chef_solo_config) {
