@@ -150,6 +150,7 @@ module Capistrano
 
           def distribute_cookbooks(filename, remote_filename, remote_destination)
             upload(filename, remote_filename)
+            run("rm -rf #{remote_destination}")
             run("cd #{File.dirname(remote_destination)} && tar xzf #{remote_filename}")
           end
 
