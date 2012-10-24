@@ -96,7 +96,7 @@ module Capistrano
             logger.info("WARNING: `chef_solo_cookbook_subdir' has been deprecated. use `chef_solo_cookbooks_subdir' instead.")
             chef_solo_cookbook_subdir
           }
-          _cset(:chef_solo_cookbooks_exclude, [])
+          _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
 
           # special variable to set multiple cookbooks repositories.
           # by default, it will build from :chef_solo_cookbooks_* variables.
