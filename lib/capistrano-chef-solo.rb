@@ -165,17 +165,23 @@ module Capistrano
             put(chef_solo_config, File.join(chef_solo_path, 'config', 'solo.rb'))
           }
 
+          # merge nested hashes
+          def _deep_merge(a, b)
+            f = lambda { |key, val1, val2| Hash === val1 && Hash === val2 ? val1.merge(val2, &f) : val2 }
+            a.merge(b, &f)
+          end
+
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_host_attributes, {})
           task(:update_attributes) {
-            attributes = chef_solo_attributes.merge('run_list' => fetch(:chef_solo_run_list, []))
+            attributes = _deep_merge(chef_solo_attributes, {'run_list' => fetch(:chef_solo_run_list, [])})
             to = File.join(chef_solo_path, 'config', 'solo.json')
             if chef_solo_host_attributes.empty?
               put(attributes.to_json, to)
             else
               execute_on_servers { |servers|
                 servers.each { |server|
-                  host_attributes = attributes.merge(chef_solo_host_attributes.fetch(server.host, {}))
+                  host_attributes = _deep_merge(attributes, chef_solo_host_attributes.fetch(server.host, {}))
                   Capistrano::Transfer.process(:up, StringIO.new(host_attributes.to_json), to, [sessions[server]], :logger => logger)
                 }
               }
