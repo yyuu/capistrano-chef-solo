@@ -2,6 +2,7 @@ require 'capistrano-chef-solo/version'
 require 'capistrano-rbenv'
 require 'capistrano/configuration'
 require 'capistrano/recipes/deploy/scm'
+require 'capistrano/transfer'
 require 'json'
 require 'tmpdir'
 require 'uri'
@@ -165,9 +166,20 @@ module Capistrano
           }
 
           _cset(:chef_solo_attributes, {})
+          _cset(:chef_solo_host_attributes, {})
           task(:update_attributes) {
             attributes = chef_solo_attributes.merge('run_list' => fetch(:chef_solo_run_list, []))
-            put(attributes.to_json, File.join(chef_solo_path, 'config', 'solo.json'))
+            to = File.join(chef_solo_path, 'config', 'solo.json')
+            if chef_solo_host_attributes.empty?
+              put(attributes.to_json, to)
+            else
+              execute_on_servers { |servers|
+                servers.each { |server|
+                  host_attributes = attributes.merge(chef_solo_host_attributes.fetch(server.host, {}))
+                  Capistrano::Transfer.process(:up, StringIO.new(host_attributes.to_json), to, [sessions[server]], :logger => logger)
+                }
+              }
+            end
           }
 
           task(:invoke) {

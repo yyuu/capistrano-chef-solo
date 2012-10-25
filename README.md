@@ -46,6 +46,7 @@ Following options are available to manage your `chef-solo`.
  * `:chef_solo_cookbooks_subdir` - the path to the `cookbooks` directory in the repository. use `config/cookbooks` by default.
  * `:chef_solo_cookbooks` - an alternative way to specify cookbooks repository. you can set multiple repositories from here.
  * `:chef_solo_attributes` - the `attributes` to apply to `chef-solo`.
+ * `:chef_solo_host_attributes` - per host `attributes` to apply to `chef-solo`. the key should be the name of the targeted host.
  * `:chef_solo_run_list` - the `run_list` to apply to `chef-solo`.
 
 ## Contributing
