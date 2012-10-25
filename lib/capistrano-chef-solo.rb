@@ -171,18 +171,26 @@ module Capistrano
             a.merge(b, &f)
           end
 
+          def _json(x)
+            if fetch(:chef_solo_pretty_json, true)
+              JSON.pretty_generate(x)
+            else
+              JSON.generate(x)
+            end
+          end
+
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_host_attributes, {})
           task(:update_attributes) {
             attributes = _deep_merge(chef_solo_attributes, {'run_list' => fetch(:chef_solo_run_list, [])})
             to = File.join(chef_solo_path, 'config', 'solo.json')
             if chef_solo_host_attributes.empty?
-              put(attributes.to_json, to)
+              put(_json(attributes), to)
             else
               execute_on_servers { |servers|
                 servers.each { |server|
                   host_attributes = _deep_merge(attributes, chef_solo_host_attributes.fetch(server.host, {}))
-                  Capistrano::Transfer.process(:up, StringIO.new(host_attributes.to_json), to, [sessions[server]], :logger => logger)
+                  Capistrano::Transfer.process(:up, StringIO.new(_json(host_attributes)), to, [sessions[server]], :logger => logger)
                 }
               }
             end
