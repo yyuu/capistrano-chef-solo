@@ -6,7 +6,7 @@ a capistrano recipe to invoke `chef-solo`.
 
 Add this line to your application's Gemfile:
 
-    gem 'capistrano-chef-solo'
+    gem 'yyuu-capistrano-chef-solo'
 
 And then execute:
 
@@ -14,7 +14,7 @@ And then execute:
 
 Or install it yourself as:
 
-    $ gem install capistrano-chef-solo
+    $ gem install yyuu-capistrano-chef-solo
 
 ## Usage
 
