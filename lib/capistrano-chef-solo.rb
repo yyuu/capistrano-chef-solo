@@ -67,7 +67,7 @@ module Capistrano
 
           task(:update_cookbooks) {
             tmpdir = Dir.mktmpdir()
-            remote_tmpdir = Dir.mktmpdir()
+            remote_tmpdir = capture("mktemp -d")
             destination = File.join(tmpdir, 'cookbooks')
             remote_destination = File.join(chef_solo_path, 'cookbooks')
             filename = File.join(tmpdir, 'cookbooks.tar.gz')
@@ -77,8 +77,8 @@ module Capistrano
               run("mkdir -p #{remote_tmpdir}")
               distribute_cookbooks(filename, remote_filename, remote_destination)
             ensure
-              run("rm -rf #{remote_tmpdir}")
-              run_locally("rm -rf #{tmpdir}")
+              run("rm -rf #{remote_tmpdir}") rescue nil
+              run_locally("rm -rf #{tmpdir}") rescue nil
             end
           }
 
