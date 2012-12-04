@@ -67,7 +67,7 @@ module Capistrano
 
           task(:update_cookbooks) {
             tmpdir = Dir.mktmpdir()
-            remote_tmpdir = capture("mktemp -d")
+            remote_tmpdir = capture("mktemp -d").chomp
             destination = File.join(tmpdir, 'cookbooks')
             remote_destination = File.join(chef_solo_path, 'cookbooks')
             filename = File.join(tmpdir, 'cookbooks.tar.gz')
