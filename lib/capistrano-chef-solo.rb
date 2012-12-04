@@ -82,32 +82,32 @@ module Capistrano
             end
           }
 
-          _cset(:chef_solo_cookbook_repository) { abort("chef_solo_cookbook_repository not set") }
-          _cset(:chef_solo_cookbooks_repository) {
+          # s/cookbook/&s/g for backward compatibility with releases older than 0.0.2.
+          # they will be removed in future releases.
+          _cset(:chef_solo_cookbook_repository) {
             logger.info("WARNING: `chef_solo_cookbook_repository' has been deprecated. use `chef_solo_cookbooks_repository' instead.")
-            chef_solo_cookbook_repository
+            abort("chef_solo_cookbook_repository not set")
           }
-          _cset(:chef_solo_cookbook_revision, 'HEAD')
-          _cset(:chef_solo_cookbooks_revision) {
+          _cset(:chef_solo_cookbook_revision) {
             logger.info("WARNING: `chef_solo_cookbook_revision' has been deprecated. use `chef_solo_cookbooks_revision' instead.")
-            chef_solo_cookbook_revision
+            "HEAD"
           }
-          _cset(:chef_solo_cookbook_subdir, '/')
-          _cset(:chef_solo_cookbooks_subdir) {
+          _cset(:chef_solo_cookbook_subdir) {
             logger.info("WARNING: `chef_solo_cookbook_subdir' has been deprecated. use `chef_solo_cookbooks_subdir' instead.")
-            chef_solo_cookbook_subdir
+            "/"
           }
           _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
 
           # special variable to set multiple cookbooks repositories.
           # by default, it will build from :chef_solo_cookbooks_* variables.
           _cset(:chef_solo_cookbooks) {
-            name = File.basename(chef_solo_cookbooks_repository, File.extname(chef_solo_cookbooks_repository))
+            repository = fetch(:chef_solo_cookbooks_repository, fetch(:chef_solo_cookbook_repository, nil))
+            name = File.basename(repository, File.extname(repository))
             {
               name => {
-                :repository => chef_solo_cookbooks_repository,
-                :revision => chef_solo_cookbooks_revision,
-                :cookbooks => chef_solo_cookbooks_subdir,
+                :repository => repository,
+                :revision => fetch(:chef_solo_cookbooks_revision, fetch(:chef_solo_cookbook_revision, nil)),
+                :cookbooks => fetch(:chef_solo_cookbooks_subdir, fetch(:chef_solo_cookbook_subdir, nil)),
                 :cookbooks_exclude => chef_solo_cookbooks_exclude,
               }
             }
