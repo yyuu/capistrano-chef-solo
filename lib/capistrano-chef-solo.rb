@@ -15,7 +15,7 @@ module Capistrano
           _cset(:chef_solo_home) {
             capture('echo $HOME').strip
           }
-          _cset(:chef_solo_version, '0.10.12')
+          _cset(:chef_solo_version, '10.16.2')
           _cset(:chef_solo_path) { File.join(chef_solo_home, 'chef') }
           _cset(:chef_solo_path_children, %w(bundle cache config cookbooks))
 
