@@ -101,16 +101,15 @@ module Capistrano
           # special variable to set multiple cookbooks repositories.
           # by default, it will build from :chef_solo_cookbooks_* variables.
           _cset(:chef_solo_cookbooks) {
-            repository = fetch(:chef_solo_cookbooks_repository, fetch(:chef_solo_cookbook_repository, nil))
+            repository = fetch(:chef_solo_cookbooks_repository, nil)
+            repository = fetch(:chef_solo_cookbook_repository, nil) unless repository # for backward compatibility
             name = File.basename(repository, File.extname(repository))
-            {
-              name => {
-                :repository => repository,
-                :revision => fetch(:chef_solo_cookbooks_revision, fetch(:chef_solo_cookbook_revision, nil)),
-                :cookbooks => fetch(:chef_solo_cookbooks_subdir, fetch(:chef_solo_cookbook_subdir, nil)),
-                :cookbooks_exclude => chef_solo_cookbooks_exclude,
-              }
-            }
+            options = { :repository => repository, :cookbooks_exclude => chef_solo_cookbooks_exclude }
+            options[:revision] = fetch(:chef_solo_cookbooks_revision, nil)
+            options[:revision] = fetch(:chef_solo_cookbook_revision, nil) unless options[:revision] # for backward compatibility
+            options[:cookbooks] = fetch(:chef_solo_cookbooks_subdir, nil)
+            options[:cookbooks] = fetch(:chef_solo_cookbook_subdir, nil) unless options[:cookbooks] # for backward compatibility
+            { name => options }
           }
 
           _cset(:chef_solo_repository_cache) { File.expand_path('./tmp/cookbooks-cache') }
