@@ -113,24 +113,23 @@ module Capistrano
             }
           }
 
-          _cset(:chef_solo_configuration, configuration)
           _cset(:chef_solo_repository_cache) { File.expand_path('./tmp/cookbooks-cache') }
           def bundle_cookbooks(filename, destination)
             dirs = [ File.dirname(filename), destination ].uniq
             run_locally("mkdir -p #{dirs.join(' ')}")
             chef_solo_cookbooks.each do |name, options|
               configuration = Capistrano::Configuration.new()
-              chef_solo_configuration.variables.merge(options).each { |key, val|
-                configuration.set(key, val)
-              }
               # refreshing just :source, :revision and :real_revision is enough?
-              configuration.set(:source) { Capistrano::Deploy::SCM.new(configuration[:scm], configuration) }
-              configuration.set(:revision) { configuration[:source].head }
-              configuration.set(:real_revision) {
-                configuration[:source].local.query_revision(configuration[:revision]) { |cmd|
-                  with_env("LC_ALL", "C") { run_locally(cmd) }
-                }
-              }
+              options = {
+                :source => proc { Capistrano::Deploy::SCM.new(configuration[:scm], configuration) },
+                :revision => proc { configuration[:source].head },
+                :real_revision => proc {
+                  configuration[:source].local.query_revision(configuration[:revision]) { |cmd| with_env("LC_ALL", "C") { run_locally(cmd) } }
+                },
+              }.merge(options)
+              variables.merge(options).each do |key, val|
+                configuration.set(key, val)
+              end
               repository_cache = File.join(chef_solo_repository_cache, name)
               if File.exist?(repository_cache)
                 run_locally(configuration[:source].sync(configuration[:real_revision], repository_cache))
