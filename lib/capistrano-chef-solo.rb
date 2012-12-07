@@ -21,14 +21,24 @@ module Capistrano
 
           desc("Run chef-solo.")
           task(:default) {
-            # login as chef user if specified
-            set(:user, fetch(:chef_solo_user, user))
-            set(:ssh_options, fetch(:chef_solo_ssh_options, ssh_options))
+            # preserve original :user and :ssh_options
+            set(:chef_solo_original_user, user)
+            set(:chef_solo_original_ssh_options, ssh_options)
 
-            transaction {
-              bootstrap
-              update
-            }
+            begin
+              # login as chef user if specified
+              set(:user, fetch(:chef_solo_user, user))
+              set(:ssh_options, fetch(:chef_solo_ssh_options, ssh_options))
+
+              transaction {
+                bootstrap
+                update
+              }
+            ensure
+              # restore original :user and :ssh_options
+              set(:user, chef_solo_original_user)
+              set(:ssh_options, chef_solo_original_ssh_options)
+            end
           }
 
           task(:bootstrap) {
