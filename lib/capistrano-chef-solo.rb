@@ -19,26 +19,40 @@ module Capistrano
           _cset(:chef_solo_path) { File.join(chef_solo_home, 'chef') }
           _cset(:chef_solo_path_children, %w(bundle cache config cookbooks))
 
-          desc("Run chef-solo.")
-          task(:default) {
+          def connect_with_settings()
             # preserve original :user and :ssh_options
-            set(:chef_solo_original_user, user)
-            set(:chef_solo_original_ssh_options, ssh_options)
-
+            set(:_chef_solo_user, user)
+            set(:_chef_solo_ssh_options, ssh_options)
+            set(:_chef_solo_rbenv_ruby_version, rbenv_ruby_version)
             begin
               # login as chef user if specified
               set(:user, fetch(:chef_solo_user, user))
               set(:ssh_options, fetch(:chef_solo_ssh_options, ssh_options))
+              set(:rbenv_ruby_version, fetch(:chef_solo_ruby_version, rbenv_ruby_version))
+              yield
+            ensure
+              # restore original :user and :ssh_options
+              set(:user, _chef_solo_user)
+              set(:ssh_options, _chef_solo_ssh_options)
+              set(:rbenv_ruby_version, _chef_solo_rbenv_ruby_version)
+            end
+          end
 
+          desc("Run chef-solo.")
+          task(:default) {
+            connect_with_settings {
               transaction {
                 bootstrap
                 update
               }
-            ensure
-              # restore original :user and :ssh_options
-              set(:user, chef_solo_original_user)
-              set(:ssh_options, chef_solo_original_ssh_options)
-            end
+            }
+          }
+
+          desc("Show version.")
+          task(:version) {
+            connect_with_settings {
+              run("cd #{chef_solo_path} && #{bundle_cmd} exec chef-solo --version")
+            }
           }
 
           task(:bootstrap) {
@@ -46,11 +60,7 @@ module Capistrano
             install_chef
           }
 
-          _cset(:chef_solo_ruby_version) {
-            rbenv_ruby_version
-          }
           task(:install_ruby) {
-            set(:rbenv_ruby_version, chef_solo_ruby_version)
             set(:rbenv_use_bundler, true)
             find_and_execute_task('rbenv:setup')
           }
