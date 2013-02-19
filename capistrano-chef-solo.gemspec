@@ -17,5 +17,5 @@ Gem::Specification.new do |gem|
   gem.version       = Capistrano::ChefSolo::VERSION
 
   gem.add_dependency("capistrano")
-  gem.add_dependency("capistrano-rbenv", ">= 0.0.3")
+  gem.add_dependency("capistrano-rbenv", "~> 0.0.3")
 end
