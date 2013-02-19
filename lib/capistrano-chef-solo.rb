@@ -4,7 +4,6 @@ require 'capistrano/configuration'
 require 'capistrano/recipes/deploy/scm'
 require 'capistrano/transfer'
 require 'json'
-require 'tmpdir'
 require 'uri'
 
 module Capistrano
@@ -86,8 +85,8 @@ module Capistrano
           }
 
           task(:update_cookbooks) {
-            tmpdir = Dir.mktmpdir()
-            remote_tmpdir = capture("mktemp -d").chomp
+            tmpdir = `mktemp -d /tmp/capistrano-chef-solo.XXXXXXXXXX`.chomp
+            remote_tmpdir = capture("mktemp -d /tmp/capistrano-chef-solo.XXXXXXXXXX").chomp
             destination = File.join(tmpdir, 'cookbooks')
             remote_destination = File.join(chef_solo_path, 'cookbooks')
             filename = File.join(tmpdir, 'cookbooks.tar.gz')
