@@ -1,10 +1,9 @@
-require 'capistrano-chef-solo/version'
-require 'capistrano-rbenv'
-require 'capistrano/configuration'
-require 'capistrano/recipes/deploy/scm'
-require 'capistrano/transfer'
-require 'json'
-require 'uri'
+require "capistrano-chef-solo/version"
+require "capistrano-rbenv"
+require "capistrano/configuration"
+require "capistrano/recipes/deploy/scm"
+require "json"
+require "uri"
 
 module Capistrano
   module ChefSolo
@@ -14,7 +13,7 @@ module Capistrano
           _cset(:chef_solo_home) {
             capture('echo $HOME').strip
           }
-          _cset(:chef_solo_version, '10.16.4')
+          _cset(:chef_solo_version, "10.16.4")
           _cset(:chef_solo_path) { File.join(chef_solo_home, 'chef') }
           _cset(:chef_solo_path_children, %w(bundle cache config cookbooks))
 
@@ -207,16 +206,19 @@ module Capistrano
 
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_host_attributes, {})
+          _cset(:chef_solo_run_list, [])
+          _cset(:chef_solo_host_run_list, {})
           task(:update_attributes) {
-            attributes = _deep_merge(chef_solo_attributes, {'run_list' => fetch(:chef_solo_run_list, [])})
-            to = File.join(chef_solo_path, 'config', 'solo.json')
-            if chef_solo_host_attributes.empty?
+            attributes = _deep_merge(chef_solo_attributes, {"run_list" => chef_solo_run_list})
+            to = File.join(chef_solo_path, "config", "solo.json")
+            if chef_solo_host_attributes.empty? and chef_solo_host_run_list.empty?
               put(_json(attributes), to)
             else
               execute_on_servers { |servers|
                 servers.each { |server|
                   host_attributes = _deep_merge(attributes, chef_solo_host_attributes.fetch(server.host, {}))
-                  Capistrano::Transfer.process(:up, StringIO.new(_json(host_attributes)), to, [sessions[server]], :logger => logger)
+                  host_attributes = _deep_merge(host_attributes, {"run_list" => chef_solo_host_run_list.fetch(server.host, [])})
+                  put(_json(attributes), to, :hosts => server.host)
                 }
               }
             end
