@@ -51,7 +51,7 @@ Following options are available to manage your `chef-solo`.
  * `:chef_solo_host_attributes` - per-host `attributes` of chef-solo. must be a `Hash<String,Hash<String,String>>`.
  * `:chef_solo_host_run_list` - per-host `run_list` of chef-solo. must be a `Hash<String,Array<String>>`.
 
-## Reference
+## Examples
 
 ### Setting `attributes` and `run_list`
 
