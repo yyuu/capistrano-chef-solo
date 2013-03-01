@@ -37,6 +37,15 @@ module Capistrano
             end
           end
 
+          desc("Setup chef-solo.")
+          task(:setup) {
+            connect_with_settings {
+              transaction {
+                bootstrap
+              }
+            }
+          }
+
           desc("Run chef-solo.")
           task(:default) {
             connect_with_settings {
