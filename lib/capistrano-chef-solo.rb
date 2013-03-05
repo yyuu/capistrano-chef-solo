@@ -191,12 +191,12 @@ module Capistrano
           }
 
           # merge nested hashes
-          def _deep_merge(a, b)
+          def deep_merge(a, b)
             f = lambda { |key, val1, val2| Hash === val1 && Hash === val2 ? val1.merge(val2, &f) : val2 }
             a.merge(b, &f)
           end
 
-          def _json(x)
+          def json(x)
             if fetch(:chef_solo_pretty_json, true)
               JSON.pretty_generate(x)
             else
@@ -204,21 +204,38 @@ module Capistrano
             end
           end
 
+          _cset(:chef_solo_capistrano_attributes) {
+            # reject lazy variables since they might have side-effects.
+            Hash[variables.reject { |key, value| value.respond_to?(:call) }]
+          }
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_host_attributes, {})
           _cset(:chef_solo_run_list, [])
           _cset(:chef_solo_host_run_list, {})
+
+          def generate_attributes(options={})
+            attributes = deep_merge(chef_solo_capistrano_attributes, chef_solo_attributes)
+            attributes = deep_merge(attributes, {"run_list" => chef_solo_run_list})
+            if options.has_key?(:host)
+              attributes = deep_merge(attributes, chef_solo_host_attributes.fetch(options[:host], {}))
+              attributes = deep_merge(attributes, {"run_list" => chef_solo_host_run_list.fetch(options[:host], [])})
+            end
+            attributes
+          end
+
+          desc("Show chef-solo attributes.")
+          task(:show_attributes) {
+            STDOUT.puts(json(generate_attributes))
+          }
+
           task(:update_attributes) {
-            attributes = _deep_merge(chef_solo_attributes, {"run_list" => chef_solo_run_list})
             to = File.join(chef_solo_path, "config", "solo.json")
             if chef_solo_host_attributes.empty? and chef_solo_host_run_list.empty?
-              put(_json(attributes), to)
+              put(json(generate_attributes), to)
             else
               execute_on_servers { |servers|
                 servers.each { |server|
-                  host_attributes = _deep_merge(attributes, chef_solo_host_attributes.fetch(server.host, {}))
-                  host_attributes = _deep_merge(host_attributes, {"run_list" => chef_solo_host_run_list.fetch(server.host, [])})
-                  put(_json(attributes), to, :hosts => server.host)
+                  put(json(generate_attributes(:host => server.host), to, :hosts => server.host))
                 }
               }
             end
