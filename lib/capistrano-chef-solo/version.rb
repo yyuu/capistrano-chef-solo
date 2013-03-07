@@ -1,5 +1,5 @@
 module Capistrano
   module ChefSolo
-    VERSION = "0.0.9"
+    VERSION = "0.1.0git"
   end
 end
