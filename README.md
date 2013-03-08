@@ -39,15 +39,14 @@ And then, now you can start using `chef-solo` via capistrano.
 Following options are available to manage your `chef-solo`.
 
  * `:chef_solo_version` - the version of chef.
- * `:chef_solo_user` - special user to invoke `chef-solo`. use `user` by default.
- * `:chef_solo_ssh_options` - special ssh options for `chef_solo_user`. use `ssh_options` by default.
- * `:chef_solo_ruby_version` - ruby version to launch `chef-solo`.
  * `:chef_solo_cookbooks_repository` - the URL of your cookbook repository. use `repository` by default.
  * `:chef_solo_cookbooks_revision` - the `branch` in the repository.
  * `:chef_solo_cookbooks_subdir` - the path to the `cookbooks` directory in the repository. use `config/cookbooks` by default.
  * `:chef_solo_cookbooks` - an alternative way to specify cookbooks repository. you can set multiple repositories from here.
  * `:chef_solo_attributes` - the `attributes` of chef-solo. must be a `Hash<String,String>`. will be converted into JSON.
  * `:chef_solo_run_list` - the `run_list` of chef-solo. must be an `Array<String>`. will be merged into `:chef_solo_attributes`.
+ * `:chef_solo_role_attributes` - per-role `attributes` of chef-solo. must be a `Hash<String,Hash<String,String>>`.
+ * `:chef_solo_role_run_list` - per-role `run_list` of chef-solo. must be a `Hash<String,Array<String>>`.
  * `:chef_solo_host_attributes` - per-host `attributes` of chef-solo. must be a `Hash<String,Hash<String,String>>`.
  * `:chef_solo_host_run_list` - per-host `run_list` of chef-solo. must be a `Hash<String,Array<String>>`.
 
