@@ -323,6 +323,7 @@ module Capistrano
                 _merge_attributes!(attributes, {"run_list" => chef_solo_host_run_list.fetch(host, [])})
               end
             else
+              attributes["run_list"] = [] # ignore run_list not from argument
               _merge_attributes!(attributes, {"run_list" => run_list})
             end
             attributes
