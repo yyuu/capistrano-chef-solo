@@ -197,32 +197,41 @@ module Capistrano
             end
           end
 
-          _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
-
-          # special variable to set multiple cookbooks repositories.
-          # by default, it will build from :chef_solo_cookbooks_* variables.
+          #
+          # The definition of cookbooks.
+          # By default, load cookbooks from local path of "config/cookbooks".
+          #
+          _cset(:chef_solo_cookbooks_scm, :none)
           _cset(:chef_solo_cookbooks) {
             cookbooks = {}
-            cookbooks["default"] = {
-              :cookbooks_type => :repository,
-              :repository => fetch(:chef_solo_cookbooks_repository),
-              :cookbooks_exclude => fetch(:chef_solo_cookbooks_exclude),
-              :revision => fetch(:chef_solo_cookbooks_revision)
-              :cookbooks => fetch(:chef_solo_cookbooks_subdir),
-            }
+            default = application
+            cookbooks[default] = {}
+            cookbooks[default][:cookbooks] = fetch(:chef_solo_cookbooks_subdir, "config/cookbooks")
+            cookbooks[default][:repository] = fetch(:chef_solo_cookbooks_repository) if exists?(:chef_solo_cookbooks_repository)
+            cookbooks[default][:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
             cookbooks
           }
+
+          _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
+          def _normalize_cookbooks(cookbooks)
+            xs = cookbooks.map { |name, options|
+              options[:scm] ||= chef_solo_cookbooks_scm
+              options[:cookbooks_exclude] ||= chef_solo_cookbooks_exclude
+              [name, options]
+            }
+            Hash[xs]
+          end
 
           _cset(:chef_solo_repository_cache) { File.expand_path("./tmp/cookbooks-cache") }
           def bundle_cookbooks(filename, destination)
             dirs = [ File.dirname(filename), destination ].uniq
             run_locally("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
-            chef_solo_cookbooks.each do |name, options|
-              case options[:cookbooks_type]
-              when :local
-                fetch_cookbooks_path(name, destination, options)
+            cookbooks = _normalize_cookbooks(chef_solo_cookbooks)
+            cookbooks.each do |name, options|
+              case options[:scm]
+              when :none
+                fetch_cookbooks_none(name, destination, options)
               else
-                # for backward compatibility.
                 fetch_cookbooks_repository(name, destination, options)
               end
             end
@@ -241,9 +250,8 @@ module Capistrano
             end
           end
 
-          def fetch_cookbooks_local(name, destination, options={})
-            local_path = ( options.delete(:path) || "." )
-            _fetch_cookbooks(local_path, destination, options)
+          def fetch_cookbooks_none(name, destination, options={})
+            _fetch_cookbooks(options.fetch(:repository, "."), destination, options)
           end
 
           def fetch_cookbooks_repository(name, destination, options={})

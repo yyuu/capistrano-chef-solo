@@ -30,7 +30,8 @@ To setup your servers with `chef-solo`, add following in you `config/deploy.rb`.
     # in "config/deploy.rb"
     require "capistrano-chef-solo"
     set(:chef_solo_version, "10.16.4")
-    set(:chef_solo_cookbooks_repository, "git@example.com:foo/bar.git")
+    set(:chef_solo_cookbooks_scm, :none)
+    set(:chef_solo_cookbooks_subdir, "config/cookbooks")
 
 And then, now you can start using `chef-solo` via capistrano.
 
@@ -39,10 +40,7 @@ And then, now you can start using `chef-solo` via capistrano.
 Following options are available to manage your `chef-solo`.
 
  * `:chef_solo_version` - the version of chef.
- * `:chef_solo_cookbooks_repository` - the URL of your cookbook repository. use `repository` by default.
- * `:chef_solo_cookbooks_revision` - the `branch` in the repository.
- * `:chef_solo_cookbooks_subdir` - the path to the `cookbooks` directory in the repository. use `config/cookbooks` by default.
- * `:chef_solo_cookbooks` - an alternative way to specify cookbooks repository. you can set multiple repositories from here.
+ * `:chef_solo_cookbooks` - the definition of cookbooks. you can set multiple repositories from here.
  * `:chef_solo_attributes` - the `attributes` of chef-solo. must be a `Hash<String,String>`. will be converted into JSON.
  * `:chef_solo_run_list` - the `run_list` of chef-solo. must be an `Array<String>`. will be merged into `:chef_solo_attributes`.
  * `:chef_solo_role_attributes` - per-role `attributes` of chef-solo. must be a `Hash<String,Hash<String,String>>`.
