@@ -60,18 +60,34 @@ module Capistrano
           #     % cap deploy:setup
           #
           _cset(:chef_solo_bootstrap, false)
+          _cset(:chef_solo_bootstrap_user) {
+            if variables.key?(:chef_solo_user)
+              logger.info(":chef_solo_user has been deprecated. use :chef_solo_bootstrap_user instead.")
+              fetch(:chef_solo_user, user)
+            else
+              user
+            end
+          }
+          _cset(:chef_solo_bootstrap_ssh_options) {
+            if variables.key?(:chef_solo_ssh_options)
+              logger.info(":chef_solo_ssh_options has been deprecated. use :chef_solo_bootstrap_ssh_options instead.")
+              fetch(:chef_solo_ssh_options, ssh_options)
+            else
+              ssh_options
+            end
+          }
           def _bootstrap_settings(&block)
             unless chef_solo_bootstrap
               # preserve original :user and :ssh_options
-              set(:_chef_solo_user, user)
-              set(:_chef_solo_ssh_options, ssh_options)
+              set(:_chef_solo_bootstrap_user, user)
+              set(:_chef_solo_bootstrap_ssh_options, ssh_options)
               begin
-                set(:user, fetch(:chef_solo_bootstrap_user, user))
-                set(:ssh_options, fetch(:chef_solo_bootstrap_ssh_options, ssh_options))
+                set(:user, chef_solo_bootstrap_user)
+                set(:ssh_options, chef_solo_bootstrap_ssh_options)
                 yield
               ensure
-                set(:user, _chef_solo_user)
-                set(:ssh_options, _chef_solo_ssh_options)
+                set(:user, _chef_solo_bootstrap_user)
+                set(:ssh_options, _chef_solo_bootstrap_ssh_options)
                 set(:chef_solo_bootstrap, false)
               end
             end
