@@ -1,0 +1,1 @@
+default["foo"]["xxx"] = "XXX"
