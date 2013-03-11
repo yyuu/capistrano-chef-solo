@@ -294,7 +294,16 @@ module Capistrano
 
           # merge nested hashes
           def _merge_attributes!(a, b)
-            f = lambda { |key, val1, val2| Hash === val1 && Hash === val2 ? val1.merge(val2, &f) : val2 }
+            f = lambda { |key, val1, val2|
+              case val1
+              when Array
+                val1 + val2
+              when Hash
+                val1.merge(val2, &f)
+              else
+                val2
+              end
+            }
             a.merge!(b, &f)
           end
 
@@ -340,6 +349,7 @@ module Capistrano
               _merge_attributes!(attributes, chef_solo_host_attributes.fetch(host, {}))
             end
             if run_list.empty?
+              _merge_attributes!(attributes, {"run_list" => chef_solo_run_list})
               roles.each do |role|
                 _merge_attributes!(attributes, {"run_list" => chef_solo_role_run_list.fetch(role, [])})
               end
