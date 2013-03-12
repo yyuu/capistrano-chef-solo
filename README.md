@@ -29,7 +29,7 @@ To setup your servers with `chef-solo`, add following in you `config/deploy.rb`.
 
     # in "config/deploy.rb"
     require "capistrano-chef-solo"
-    set(:chef_solo_version, "10.16.4")
+    set(:chef_solo_version, "11.4.0")
     set(:chef_solo_cookbooks_scm, :none)
     set(:chef_solo_cookbooks_subdir, "config/cookbooks")
 

@@ -32,7 +32,7 @@ module Capistrano
         }
 
         namespace(:chef_solo) {
-          _cset(:chef_solo_version, "10.16.4")
+          _cset(:chef_solo_version, "11.4.0")
           _cset(:chef_solo_path) { capture("echo $HOME/chef").strip }
           _cset(:chef_solo_path_children, %w(bundle cache config cookbooks))
           _cset(:chef_solo_config_file) { File.join(chef_solo_path, "config", "solo.rb") }
