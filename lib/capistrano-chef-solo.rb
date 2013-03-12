@@ -236,7 +236,7 @@ module Capistrano
             run_locally("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
             cookbooks = _normalize_cookbooks(chef_solo_cookbooks)
             cookbooks.each do |name, options|
-              case options[:scm]
+              case options[:scm].to_sym
               when :none
                 fetch_cookbooks_none(name, destination, options)
               else
@@ -372,12 +372,11 @@ module Capistrano
           end
 
           def update_attributes(options={})
-            hosts = find_servers_for_task(current_task).map { |servers| servers.host }
-            roles = current_task.options[:roles]
             run_list = options.delete(:run_list)
-            hosts.each do |host|
-              attributes = _generate_attributes(:hosts => host, :roles => roles, :run_list => run_list)
-              top.put(_json_attributes(attributes), chef_solo_attributes_file, options.merge(:hosts => host))
+            servers = find_servers_for_task(current_task)
+            servers.each do |server|
+              attributes = _generate_attributes(:hosts => server.host, :roles => role_names_for_host(server), :run_list => run_list)
+              top.put(_json_attributes(attributes), chef_solo_attributes_file, options.merge(:hosts => server.host))
             end
           end
 
