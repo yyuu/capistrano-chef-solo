@@ -119,7 +119,7 @@ module Capistrano
             connect_with_settings do
               setup
               transaction do
-                update(:run_list => nil)
+                update
                 invoke
               end
             end
@@ -154,8 +154,18 @@ module Capistrano
           }
 
           task(:install_ruby, :except => { :no_release => true }) {
+            #
+            # do not run `rbenv:setup` if requested ruby is installed.
+            #
             set(:rbenv_use_bundler, true)
-            find_and_execute_task("rbenv:setup")
+            reset!(:rbenv_ruby_versions)
+            required = false
+            begin
+              required = not(rbenv_ruby_versions.include?(rbenv_ruby_version))
+            rescue
+              required = true
+            end
+            find_and_execute_task("rbenv:setup") if required
           }
 
           _cset(:chef_solo_gemfile) {
@@ -364,7 +374,7 @@ module Capistrano
           end
 
           def update_attributes(options={})
-            hosts = find_servers_for_task(current_task)
+            hosts = find_servers_for_task(current_task).map { |servers| servers.host }
             roles = current_task.options[:roles]
             run_list = options.delete(:run_list)
             hosts.each do |host|

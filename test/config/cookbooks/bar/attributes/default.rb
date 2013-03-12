@@ -1,1 +1,0 @@
-default["bar"]["yyy"] = "YYY"

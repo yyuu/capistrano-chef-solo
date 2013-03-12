@@ -1,4 +1,4 @@
-file "/tmp/baz" do
+file "/tmp/two" do
   owner "root"
   group "root"
   mode "0644"

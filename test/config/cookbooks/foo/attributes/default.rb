@@ -1,1 +1,0 @@
-default["foo"]["xxx"] = "XXX"
