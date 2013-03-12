@@ -145,7 +145,11 @@ module Capistrano
 
           desc("Show chef-solo attributes.")
           task(:attributes, :except => { :no_release => true }) {
-            STDOUT.puts(_json_attributes(_generate_attributes))
+            hosts = ENV.fetch("HOST", "").split(/\s*,\s*/)
+            roles = ENV.fetch("ROLE", "").split(/\s*,\s*/).map { |role| role.to_sym }
+            roles += hosts.map { |host| role_names_for_host(ServerDefinition.new(host)) }
+            attributes = _generate_attributes(:hosts => hosts.uniq, :roles => roles.uniq)
+            STDOUT.puts(_json_attributes(attributes))
           }
 
           task(:install, :except => { :no_release => true }) {
