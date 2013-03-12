@@ -154,18 +154,8 @@ module Capistrano
           }
 
           task(:install_ruby, :except => { :no_release => true }) {
-            #
-            # do not run `rbenv:setup` if requested ruby is installed.
-            #
-            set(:rbenv_use_bundler, true)
-            reset!(:rbenv_ruby_versions)
-            required = false
-            begin
-              required = not(rbenv_ruby_versions.include?(rbenv_ruby_version))
-            rescue
-              required = true
-            end
-            find_and_execute_task("rbenv:setup") if required
+            set(:rbenv_install_bundler, true)
+            find_and_execute_task("rbenv:setup")
           }
 
           _cset(:chef_solo_gemfile) {

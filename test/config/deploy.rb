@@ -154,28 +154,28 @@ namespace(:test_with_remote_cookbooks) {
     flush_attributes!
     set(:chef_solo_run_list, %w(recipe[one] recipe[two]))
     set(:chef_solo_cookbooks_scm, :git)
-    set(:chef_solo_cookbooks_repository, "git://github.com/yyuu/capistrano-chef-solo")
+    set(:chef_solo_cookbooks_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
     set(:chef_solo_cookbooks_revision, "develop")
-    set(:chef_solo_cookbooks_subdir, "test/config/cookbooks2")
+    set(:chef_solo_cookbooks_subdir, "test/config/cookbooks-ext")
     reset!(:chef_solo_cookbooks)
   }
 
   task(:teardown) {
   }
 
-# task(:test_invoke) {
-#   expected = chef_solo_run_list
-#   find_and_execute_task("chef-solo")
-#   assert_run_list(expected)
-#   check_applied_recipes!(expected)
-# }
+  task(:test_invoke) {
+    expected = chef_solo_run_list
+    find_and_execute_task("chef-solo")
+    assert_run_list(expected)
+    check_applied_recipes!(expected)
+  }
 
-# task(:test_run_list) {
-#   expected = %w(recipe[three])
-#   chef_solo.run_list expected
-#   assert_run_list(expected)
-#   check_applied_recipes!(expected)
-# }
+  task(:test_run_list) {
+    expected = %w(recipe[three])
+    chef_solo.run_list expected
+    assert_run_list(expected)
+    check_applied_recipes!(expected)
+  }
 }
 
 namespace(:test_with_multiple_cookbooks) {
@@ -200,7 +200,7 @@ namespace(:test_with_multiple_cookbooks) {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
         :revision => "develop",
-        :cookbooks => "test/config/cookbooks2",
+        :cookbooks => "test/config/cookbooks-ext",
       },
     }}
     reset!(:chef_solo_cookbooks)
@@ -209,19 +209,19 @@ namespace(:test_with_multiple_cookbooks) {
   task(:teardown) {
   }
 
-# task(:test_invoke) {
-#   expected = chef_solo_run_list
-#   find_and_execute_task("chef-solo")
-#   assert_run_list(expected)
-#   check_applied_recipes!(expected)
-# }
+  task(:test_invoke) {
+    expected = chef_solo_run_list
+    find_and_execute_task("chef-solo")
+    assert_run_list(expected)
+    check_applied_recipes!(expected)
+  }
 
-# task(:test_run_list) {
-#   expected = %w(recipe[foo] recipe[one])
-#   chef_solo.run_list expected
-#   assert_run_list(expected)
-#   check_applied_recipes!(expected)
-# }
+  task(:test_run_list) {
+    expected = %w(recipe[foo] recipe[one])
+    chef_solo.run_list expected
+    assert_run_list(expected)
+    check_applied_recipes!(expected)
+  }
 }
 
 # vim:set ft=ruby sw=2 ts=2 :
