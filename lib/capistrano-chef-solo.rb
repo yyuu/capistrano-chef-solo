@@ -165,13 +165,21 @@ module Capistrano
             EOS
           }
           task(:install_chef, :except => { :no_release => true }) {
-            dirs = chef_solo_path_children.map { |dir| File.join(chef_solo_path, dir) }
-            run("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
-            top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
-            args = fetch(:chef_solo_bundle_options, [])
-            args << "--path=#{File.join(chef_solo_path, "bundle").dump}"
-            args << "--quiet"
-            run("cd #{chef_solo_path.dump} && #{bundle_cmd} install #{args.join(" ")}")
+            begin
+              version = capture("cd #{chef_solo_path.dump} && #{bundle_cmd} exec chef-solo --version")
+              installed = Regexp.new(Regexp.escape(chef_solo_version)) =~ version
+            rescue
+              installed = false
+            end
+            unless installed
+              dirs = chef_solo_path_children.map { |dir| File.join(chef_solo_path, dir) }
+              run("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
+              top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
+              args = fetch(:chef_solo_bundle_options, [])
+              args << "--path=#{File.join(chef_solo_path, "bundle").dump}"
+              args << "--quiet"
+              run("cd #{chef_solo_path.dump} && #{bundle_cmd} install #{args.join(" ")}")
+            end
           }
  
           def update(options={})
@@ -201,14 +209,14 @@ module Capistrano
           # The definition of cookbooks.
           # By default, load cookbooks from local path of "config/cookbooks".
           #
+          _cset(:chef_solo_cookbooks_name) { application }
           _cset(:chef_solo_cookbooks_scm, :none)
           _cset(:chef_solo_cookbooks) {
             cookbooks = {}
-            default = application
-            cookbooks[default] = {}
-            cookbooks[default][:cookbooks] = fetch(:chef_solo_cookbooks_subdir, "config/cookbooks")
-            cookbooks[default][:repository] = fetch(:chef_solo_cookbooks_repository) if exists?(:chef_solo_cookbooks_repository)
-            cookbooks[default][:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
+            cookbooks[chef_solo_cookbooks_name] = {}
+            cookbooks[chef_solo_cookbooks_name][:cookbooks] = fetch(:chef_solo_cookbooks_subdir, "config/cookbooks")
+            cookbooks[chef_solo_cookbooks_name][:repository] = fetch(:chef_solo_cookbooks_repository) if exists?(:chef_solo_cookbooks_repository)
+            cookbooks[chef_solo_cookbooks_name][:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
             cookbooks
           }
 

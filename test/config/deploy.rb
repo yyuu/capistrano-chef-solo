@@ -196,14 +196,14 @@ namespace(:test_with_multiple_cookbooks) {
         :repository => File.expand_path("..", File.dirname(__FILE__)),
         :cookbooks => "config/cookbooks",
       },
-      "repository" => {
+      chef_solo_cookbooks_name => {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
         :revision => "develop",
         :cookbooks => "test/config/cookbooks-ext",
       },
     }}
-    reset!(:chef_solo_cookbooks)
+#   reset!(:chef_solo_cookbooks)
   }
 
   task(:teardown) {
