@@ -94,27 +94,6 @@ module Capistrano
               end
             end
           end
-          #
-          # Let's say you have two users on target servers.
-          #
-          # * ubuntu - the default user of system, created by system installer.
-          #            use this for bootstrap.
-          # * deploy - the user to use for application deployments.
-          #            will be created during bootstrap.
-          #
-          # Then, set these users in your Capfile.
-          #
-          #     set(:user, "deploy")
-          #     set(:chef_solo_bootstrap_user, "ubuntu")
-          #
-          # To bootstrap the system from clean installation:
-          #
-          #     % cap -S chef_solo_bootstrap=true chef-solo
-          #
-          # After the bootstrap, there is `deploy` user:
-          #
-          #     % cap deploy:setup
-          #
           _cset(:chef_solo_bootstrap, false)
           def connect_with_settings(&block)
             if chef_solo_bootstrap
