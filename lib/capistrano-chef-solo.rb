@@ -46,6 +46,7 @@ module Capistrano
               user
             end
           }
+          _cset(:chef_solo_bootstrap_password) { password }
           _cset(:chef_solo_bootstrap_ssh_options) {
             if variables.key?(:chef_solo_ssh_options)
               logger.info(":chef_solo_ssh_options has been deprecated. use :chef_solo_bootstrap_ssh_options instead.")
@@ -54,24 +55,28 @@ module Capistrano
               ssh_options
             end
           }
+          _cset(:chef_solo_use_password) {
+            auth_methods = ssh_options.fetch(:auth_methods, []).map { |m| m.to_sym }
+            auth_methods.include?(:password) or auth_methods.empty?
+          }
           def _bootstrap_settings(&block)
             if fetch(:_chef_solo_bootstrapped, false)
               yield
             else
               # preserve original :user and :ssh_options
               set(:_chef_solo_bootstrap_user, fetch(:user))
-              set(:_chef_solo_bootstrap_password, fetch(:password))
+              set(:_chef_solo_bootstrap_password, fetch(:password)) if chef_solo_use_password
               set(:_chef_solo_bootstrap_ssh_options, fetch(:ssh_options))
               begin
                 set(:user, chef_solo_bootstrap_user)
-                set(:password, chef_solo_bootstrap_password)
+                set(:password, chef_solo_bootstrap_password) if chef_solo_use_password
                 set(:ssh_options, chef_solo_bootstrap_ssh_options)
                 set(:_chef_solo_bootstrapped, true)
                 teardown_connections_to(find_servers) # drop current connections
                 yield
               ensure
                 set(:user, _chef_solo_bootstrap_user)
-                set(:password, _chef_solo_bootstrap_password)
+                set(:password, _chef_solo_bootstrap_password) if chef_solo_use_password
                 set(:ssh_options, _chef_solo_bootstrap_ssh_options)
                 set(:_chef_solo_bootstrapped, false)
                 teardown_connections_to(find_servers) # drop bootstrap connections
@@ -347,7 +352,7 @@ module Capistrano
             :application, :deploy_to, :rails_env, :latest_release,
             :releases_path, :shared_path, :current_path, :release_path,
           ])
-          _cset(:chef_solo_capistrano_attributes_exclude, [:logger])
+          _cset(:chef_solo_capistrano_attributes_exclude, [:logger, :password])
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_host_attributes, {})
           _cset(:chef_solo_role_attributes, {})
