@@ -1,0 +1,5 @@
+maintainer       "Yamashita, Yuu"
+maintainer_email "yamashita@geishatokyo.com"
+description      "baz"
+long_description "baz"
+version          "0.0.1"

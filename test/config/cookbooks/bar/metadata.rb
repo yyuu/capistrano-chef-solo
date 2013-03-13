@@ -1,0 +1,5 @@
+maintainer       "Yamashita, Yuu"
+maintainer_email "yamashita@geishatokyo.com"
+description      "bar"
+long_description "bar"
+version          "0.0.1"
