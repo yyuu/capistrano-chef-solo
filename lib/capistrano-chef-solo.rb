@@ -38,28 +38,6 @@ module Capistrano
           _cset(:chef_solo_config_file) { File.join(chef_solo_path, "config", "solo.rb") }
           _cset(:chef_solo_attributes_file) { File.join(chef_solo_path, "config", "solo.json") }
 
-          #
-          # Let's say you have two users on your servers.
-          #
-          # * admin  - the default user of system, created by system installer.
-          #            use this for bootstrap.
-          # * deploy - the user to use for application deployments.
-          #            will be created during bootstrap.
-          #
-          # Then, set these users in your Capfile.
-          #
-          #     set(:user, "deploy")
-          #     set(:chef_solo_bootstrap_user, "admin")
-          #
-          # To bootstrap the system from clean installation:
-          #
-          #     % cap -S chef_solo_bootstrap=true chef-solo
-          #
-          # After the bootstrap, there is `deploy` user:
-          #
-          #     % cap deploy:setup
-          #
-          _cset(:chef_solo_bootstrap, false)
           _cset(:chef_solo_bootstrap_user) {
             if variables.key?(:chef_solo_user)
               logger.info(":chef_solo_user has been deprecated. use :chef_solo_bootstrap_user instead.")
@@ -77,24 +55,51 @@ module Capistrano
             end
           }
           def _bootstrap_settings(&block)
-            unless chef_solo_bootstrap
+            if fetch(:_chef_solo_bootstrapped, false)
+              yield
+            else
               # preserve original :user and :ssh_options
-              set(:_chef_solo_bootstrap_user, user)
-              set(:_chef_solo_bootstrap_ssh_options, ssh_options)
+              set(:_chef_solo_bootstrap_user, fetch(:user))
+              set(:_chef_solo_bootstrap_password, fetch(:password))
+              set(:_chef_solo_bootstrap_ssh_options, fetch(:ssh_options))
               begin
                 set(:user, chef_solo_bootstrap_user)
+                set(:password, chef_solo_bootstrap_password)
                 set(:ssh_options, chef_solo_bootstrap_ssh_options)
+                set(:_chef_solo_bootstrapped, true)
+                teardown_connections_to(find_servers) # drop current connections
                 yield
               ensure
                 set(:user, _chef_solo_bootstrap_user)
+                set(:password, _chef_solo_bootstrap_password)
                 set(:ssh_options, _chef_solo_bootstrap_ssh_options)
-                set(:chef_solo_bootstrap, false)
+                set(:_chef_solo_bootstrapped, false)
+                teardown_connections_to(find_servers) # drop bootstrap connections
               end
             end
           end
-
-          # All of _public_ tasks should be surrounded by `connect_with_settings`.
-          # Call of `connect_with_settings` can be nested.
+          #
+          # Let's say you have two users on target servers.
+          #
+          # * ubuntu - the default user of system, created by system installer.
+          #            use this for bootstrap.
+          # * deploy - the user to use for application deployments.
+          #            will be created during bootstrap.
+          #
+          # Then, set these users in your Capfile.
+          #
+          #     set(:user, "deploy")
+          #     set(:chef_solo_bootstrap_user, "ubuntu")
+          #
+          # To bootstrap the system from clean installation:
+          #
+          #     % cap -S chef_solo_bootstrap=true chef-solo
+          #
+          # After the bootstrap, there is `deploy` user:
+          #
+          #     % cap deploy:setup
+          #
+          _cset(:chef_solo_bootstrap, false)
           def connect_with_settings(&block)
             if chef_solo_bootstrap
               _bootstrap_settings do

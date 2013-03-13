@@ -8,9 +8,7 @@ set :scm, :none
 set :use_sudo, false
 set :user, "vagrant"
 set :password, "vagrant"
-set :ssh_options do
-  {:user_known_hosts_file => "/dev/null"}
-end
+set :ssh_options, {:user_known_hosts_file => "/dev/null"}
 
 role :web, "192.168.33.10"
 role :app, "192.168.33.10"
@@ -26,6 +24,8 @@ task(:test_all) {
   find_and_execute_task("test_with_local_cookbooks")
   find_and_execute_task("test_with_remote_cookbooks")
   find_and_execute_task("test_with_multiple_cookbooks")
+  find_and_execute_task("test_with_bootstrap")
+  find_and_execute_task("test_without_bootstrap")
 }
 
 def download_attributes()
@@ -85,6 +85,7 @@ namespace(:test_default) {
     set(:chef_solo_run_list, %w(recipe[foo]))
     set(:chef_solo_role_run_list, {:app => %w(recipe[bar])})
     set(:chef_solo_host_run_list, {"192.168.33.10" => %w(recipe[baz])})
+    set(:chef_solo_capistrano_attributes_include, [:application, :deploy_to])
   }
 
   task(:teardown) {
@@ -101,6 +102,7 @@ namespace(:test_default) {
   task(:test_attributes, :roles => :app) {
     chef_solo.update_attributes
     assert_attributes({"aaa" => "AAA", "bbb" => "BBB", "ccc" => "CCC", "run_list" => %w(recipe[foo] recipe[bar] recipe[baz])})
+    assert_attributes({"application" => application, "deploy_to" => deploy_to})
   }
 }
 
@@ -223,4 +225,85 @@ namespace(:test_with_multiple_cookbooks) {
   }
 }
 
+namespace(:test_with_bootstrap) {
+  task(:default) {
+    methods.grep(/^test_/).each do |m|
+      send(m)
+    end
+  }
+  before "test_with_bootstrap", "test_with_bootstrap:setup"
+  after "test_with_bootstrap", "test_with_bootstrap:teardown"
+
+  task(:setup) {
+    set(:chef_solo_bootstrap, true)
+    set(:chef_solo_bootstrap_user, "bootstrap")
+    set(:chef_solo_bootstrap_password, "bootstrap")
+    run("getent passwd #{chef_solo_bootstrap_user.dump} || " +
+        "#{sudo} useradd -m -p #{chef_solo_bootstrap_password.crypt(chef_solo_bootstrap_password).dump} #{chef_solo_bootstrap_user.dump}")
+  }
+
+  task(:teardown) {
+    set(:chef_solo_bootstrap, false)
+    set(:chef_solo_bootstrap_user, nil)
+    set(:chef_solo_bootstrap_password, nil)
+  }
+
+  task(:test_connect_with_settings) {
+    x = 0
+    run("echo #{user.dump} = $(whoami) && test vagrant = $(whoami)")
+    chef_solo.connect_with_settings do
+      x += 1
+      run("echo #{user.dump} = $(whoami) && test bootstrap = $(whoami)")
+      chef_solo.connect_with_settings do
+        x += 1
+        run("echo #{user.dump} = $(whoami) && test bootstrap = $(whoami)")
+      end
+      x += 1
+      run("echo #{user.dump} = $(whoami) && test bootstrap = $(whoami)")
+    end
+    x += 1
+    run("echo #{user.dump} = $(whoami) && echo test vagrant = $(whoami)")
+    abort("some clauses may be skipped") if x != 4
+  }
+}
+
+namespace(:test_without_bootstrap) {
+  task(:default) {
+    methods.grep(/^test_/).each do |m|
+      send(m)
+    end
+  }
+  before "test_without_bootstrap", "test_without_bootstrap:setup"
+  after "test_without_bootstrap", "test_without_bootstrap:teardown"
+
+  task(:setup) {
+    set(:chef_solo_bootstrap, false)
+    set(:chef_solo_bootstrap_user, "bootstrap")
+    set(:chef_solo_bootstrap_password, "bootstrap")
+  }
+
+  task(:teardown) {
+    set(:chef_solo_bootstrap, false)
+    set(:chef_solo_bootstrap_user, nil)
+    set(:chef_solo_bootstrap_password, nil)
+  }
+
+  task(:test_connect_with_settings) {
+    x = 0
+    run("echo #{user.dump} = $(whoami) && test vagrant = $(whoami)")
+    chef_solo.connect_with_settings do
+      x += 1
+      run("echo #{user.dump} = $(whoami) && test vagrant = $(whoami)")
+      chef_solo.connect_with_settings do
+        x += 1
+        run("echo #{user.dump} = $(whoami) && test vagrant = $(whoami)")
+      end
+      x += 1
+      run("echo #{user.dump} = $(whoami) && test vagrant = $(whoami)")
+    end
+    x += 1
+    run("echo #{user.dump} = $(whoami) && echo test vagrant = $(whoami)")
+    abort("some clauses may be skipped") if x != 4
+  }
+}
 # vim:set ft=ruby sw=2 ts=2 :
