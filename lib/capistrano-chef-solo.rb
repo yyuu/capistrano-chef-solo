@@ -67,21 +67,30 @@ module Capistrano
               set(:_chef_solo_bootstrap_user, fetch(:user))
               set(:_chef_solo_bootstrap_password, fetch(:password)) if chef_solo_use_password
               set(:_chef_solo_bootstrap_ssh_options, fetch(:ssh_options))
+              servers = find_servers
               begin
+                # we have to establish connections before teardown.
+                # https://github.com/capistrano/capistrano/pull/416
+                establish_connections_to(servers)
+                logger.info("entering chef-solo bootstrap mode. reconnect to servers as `#{chef_solo_bootstrap_user}'.")
+                # drop connection which is connected as standard :user.
+                teardown_connections_to(servers)
                 set(:user, chef_solo_bootstrap_user)
                 set(:password, chef_solo_bootstrap_password) if chef_solo_use_password
                 set(:ssh_options, chef_solo_bootstrap_ssh_options)
                 set(:_chef_solo_bootstrapped, true)
-                teardown_connections_to(find_servers) # drop current connections
-                logger.info("entering chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
                 yield
               ensure
                 set(:user, _chef_solo_bootstrap_user)
                 set(:password, _chef_solo_bootstrap_password) if chef_solo_use_password
                 set(:ssh_options, _chef_solo_bootstrap_ssh_options)
                 set(:_chef_solo_bootstrapped, false)
-                teardown_connections_to(find_servers) # drop bootstrap connections
+                # we have to establish connections before teardown.
+                # https://github.com/capistrano/capistrano/pull/416
+                establish_connections_to(servers)
                 logger.info("leaving chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
+                # drop connection which is connected as bootstrap :user.
+                teardown_connections_to(servers)
               end
             end
           end
