@@ -59,51 +59,73 @@ module Capistrano
             auth_methods = ssh_options.fetch(:auth_methods, []).map { |m| m.to_sym }
             auth_methods.include?(:password) or auth_methods.empty?
           }
-          def _bootstrap_settings(&block)
-            if fetch(:_chef_solo_bootstrapped, false)
-              yield
+
+          _cset(:_chef_solo_bootstrapped, false)
+          def _activate_settings(servers=[])
+            if _chef_solo_bootstrapped
+              false
             else
               # preserve original :user and :ssh_options
               set(:_chef_solo_bootstrap_user, fetch(:user))
               set(:_chef_solo_bootstrap_password, fetch(:password)) if chef_solo_use_password
               set(:_chef_solo_bootstrap_ssh_options, fetch(:ssh_options))
-              servers = find_servers
-              begin
-                # we have to establish connections before teardown.
-                # https://github.com/capistrano/capistrano/pull/416
-                establish_connections_to(servers)
-                logger.info("entering chef-solo bootstrap mode. reconnect to servers as `#{chef_solo_bootstrap_user}'.")
-                # drop connection which is connected as standard :user.
-                teardown_connections_to(servers)
-                set(:user, chef_solo_bootstrap_user)
-                set(:password, chef_solo_bootstrap_password) if chef_solo_use_password
-                set(:ssh_options, chef_solo_bootstrap_ssh_options)
-                set(:_chef_solo_bootstrapped, true)
-                yield
-              ensure
-                set(:user, _chef_solo_bootstrap_user)
-                set(:password, _chef_solo_bootstrap_password) if chef_solo_use_password
-                set(:ssh_options, _chef_solo_bootstrap_ssh_options)
-                set(:_chef_solo_bootstrapped, false)
-                # we have to establish connections before teardown.
-                # https://github.com/capistrano/capistrano/pull/416
-                establish_connections_to(servers)
-                logger.info("leaving chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
-                # drop connection which is connected as bootstrap :user.
-                teardown_connections_to(servers)
-              end
+              # we have to establish connections before teardown.
+              # https://github.com/capistrano/capistrano/pull/416
+              establish_connections_to(servers)
+              logger.info("entering chef-solo bootstrap mode. reconnect to servers as `#{chef_solo_bootstrap_user}'.")
+              # drop connection which is connected as standard :user.
+              teardown_connections_to(servers)
+              set(:user, chef_solo_bootstrap_user)
+              set(:password, chef_solo_bootstrap_password) if chef_solo_use_password
+              set(:ssh_options, chef_solo_bootstrap_ssh_options)
+              set(:_chef_solo_bootstrapped, true)
+              true
             end
           end
+
+          def _deactivate_settings(servers=[])
+            if _chef_solo_bootstrapped
+              set(:user, _chef_solo_bootstrap_user)
+              set(:password, _chef_solo_bootstrap_password) if chef_solo_use_password
+              set(:ssh_options, _chef_solo_bootstrap_ssh_options)
+              set(:_chef_solo_bootstrapped, false)
+              # we have to establish connections before teardown.
+              # https://github.com/capistrano/capistrano/pull/416
+              establish_connections_to(servers)
+              logger.info("leaving chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
+              # drop connection which is connected as bootstrap :user.
+              teardown_connections_to(servers)
+              true
+            else
+              false
+            end
+          end
+
           _cset(:chef_solo_bootstrap, false)
           def connect_with_settings(&block)
             if chef_solo_bootstrap
-              _bootstrap_settings do
-                yield
+              servers = find_servers
+              if block_given?
+                begin
+                  activated = _activate_settings(servers)
+                  yield
+                ensure
+                  _deactivate_settings(servers) if activated
+                end
+              else
+                _activate_settings(servers)
               end
             else
-              yield
+              yield if block_given?
             end
           end
+
+          # Some variables (such like :rbenv_path of capistrano-rbenv) may be initialized
+          # without bootstrap settings during `on :start`.
+          # Try to connect with bootstrap settings as soon as cap started to avoid it.
+#         before "rbenv:setup_default_environment" do
+#           connect_with_settings
+#         end
 
           desc("Setup chef-solo.")
           task(:setup, :except => { :no_release => true }) {
