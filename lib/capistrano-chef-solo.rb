@@ -73,6 +73,7 @@ module Capistrano
                 set(:ssh_options, chef_solo_bootstrap_ssh_options)
                 set(:_chef_solo_bootstrapped, true)
                 teardown_connections_to(find_servers) # drop current connections
+                logger.info("entering chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
                 yield
               ensure
                 set(:user, _chef_solo_bootstrap_user)
@@ -80,6 +81,7 @@ module Capistrano
                 set(:ssh_options, _chef_solo_bootstrap_ssh_options)
                 set(:_chef_solo_bootstrapped, false)
                 teardown_connections_to(find_servers) # drop bootstrap connections
+                logger.info("leaving chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
               end
             end
           end
