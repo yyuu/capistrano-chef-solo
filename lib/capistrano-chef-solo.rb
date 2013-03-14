@@ -120,12 +120,12 @@ module Capistrano
             end
           end
 
-          # Some variables (such like :rbenv_path of capistrano-rbenv) may be initialized
-          # without bootstrap settings during `on :start`.
-          # Try to connect with bootstrap settings as soon as cap started to avoid it.
-#         before "rbenv:setup_default_environment" do
-#           connect_with_settings
-#         end
+          # FIXME:
+          # Some variables (such like :default_environment set by capistrano-rbenv) may be
+          # initialized without bootstrap settings during `on :start`.
+          # Is there any way to avoid this without setting `:rbenv_setup_default_environment`
+          # as false?
+          set(:rbenv_setup_default_environment, false)
 
           desc("Setup chef-solo.")
           task(:setup, :except => { :no_release => true }) {
