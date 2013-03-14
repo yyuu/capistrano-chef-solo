@@ -76,7 +76,7 @@ After the bootstrap, you can deploy application normaly with `deploy` user.
 
 ### Using cookbooks
 
-#### Using cookbooks from local path
+#### Using cookbooks in local path
 
 By default, `capistrano-chef-solo` searches cookbooks from local path of `config/cookbooks`.
 You can specify the cookbooks directory with using `chef_solo_cookbooks_subdir`.
@@ -86,7 +86,7 @@ set(:chef_solo_cookbooks_scm, :none)
 set(:chef_solo_cookbooks_subdir, "config/cookbooks")
 ```
 
-#### Using cookbooks from remote repository
+#### Using cookbooks in remote repository
 
 You can use cookbooks in remote repository.
 
@@ -158,7 +158,7 @@ set(:chef_solo_role_run_list) {
 }
 ```
 
-#### Setting individual attributes per host
+#### Setting individual attributes per hosts
 
 In some cases, you may want to apply individual `attributes` per hosts.
 (Something like `server_id` of mysqld or VRRP priority of keepalived)
