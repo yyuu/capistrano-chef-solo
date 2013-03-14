@@ -186,7 +186,7 @@ set(:chef_solo_host_attributes) {
 
 You can check generated attributes with using `chef-solo:attributes` task.
 
-    % cap HOST=foo.example.com chef-solo:attributes
+    % cap HOST=foo1.example.com chef-solo:attributes
 
 
 ## Reference
