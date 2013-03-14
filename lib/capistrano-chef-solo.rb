@@ -158,10 +158,12 @@ module Capistrano
             end
           end
 
+          _cset(:chef_solo_cmd, "chef-solo")
+
           desc("Show chef-solo version.")
           task(:version, :except => { :no_release => true }) {
             connect_with_settings do
-              run("cd #{chef_solo_path.dump} && #{bundle_cmd} exec chef-solo --version")
+              run("cd #{chef_solo_path.dump} && #{bundle_cmd} exec #{chef_solo_cmd} --version")
             end
           }
 
@@ -192,7 +194,7 @@ module Capistrano
           }
           task(:install_chef, :except => { :no_release => true }) {
             begin
-              version = capture("cd #{chef_solo_path.dump} && #{bundle_cmd} exec chef-solo --version")
+              version = capture("cd #{chef_solo_path.dump} && #{bundle_cmd} exec #{chef_solo_cmd} --version")
               installed = Regexp.new(Regexp.escape(chef_solo_version)) =~ version
             rescue
               installed = false
@@ -424,11 +426,10 @@ module Capistrano
           end
 
           def invoke(options={})
-            bin = fetch(:chef_solo_executable, "chef-solo")
             args = fetch(:chef_solo_options, [])
             args << "-c #{chef_solo_config_file.dump}"
             args << "-j #{chef_solo_attributes_file.dump}"
-            run("cd #{chef_solo_path.dump} && #{sudo} #{bundle_cmd} exec #{bin.dump} #{args.join(" ")}", options)
+            run("cd #{chef_solo_path.dump} && #{sudo} #{bundle_cmd} exec #{chef_solo_cmd} #{args.join(" ")}", options)
           end
         }
       }
