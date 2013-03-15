@@ -32,6 +32,7 @@ To setup your servers with `chef-solo`, add following in you `config/deploy.rb`.
 # in "config/deploy.rb"
 require "capistrano-chef-solo"
 set(:chef_solo_version, "11.4.0")
+set(:rbenv_ruby_version, "1.9.3-p392")
 ```
 
 And then, now you can start using `chef-solo` via Capistrano.
