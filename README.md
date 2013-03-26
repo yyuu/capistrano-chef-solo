@@ -32,6 +32,7 @@ To setup your servers with `chef-solo`, add following in you `config/deploy.rb`.
 # in "config/deploy.rb"
 require "capistrano-chef-solo"
 set(:chef_solo_version, "11.4.0")
+set(:rbenv_ruby_version, "1.9.3-p392")
 ```
 
 And then, now you can start using `chef-solo` via Capistrano.
@@ -76,7 +77,7 @@ After the bootstrap, you can deploy application normaly with `deploy` user.
 
 ### Using cookbooks
 
-#### Using cookbooks from local path
+#### Using cookbooks in local path
 
 By default, `capistrano-chef-solo` searches cookbooks from local path of `config/cookbooks`.
 You can specify the cookbooks directory with using `chef_solo_cookbooks_subdir`.
@@ -86,7 +87,7 @@ set(:chef_solo_cookbooks_scm, :none)
 set(:chef_solo_cookbooks_subdir, "config/cookbooks")
 ```
 
-#### Using cookbooks from remote repository
+#### Using cookbooks in remote repository
 
 You can use cookbooks in remote repository.
 
@@ -158,7 +159,7 @@ set(:chef_solo_role_run_list) {
 }
 ```
 
-#### Setting individual attributes per host
+#### Setting individual attributes per hosts
 
 In some cases, you may want to apply individual `attributes` per hosts.
 (Something like `server_id` of mysqld or VRRP priority of keepalived)
@@ -186,7 +187,7 @@ set(:chef_solo_host_attributes) {
 
 You can check generated attributes with using `chef-solo:attributes` task.
 
-    % cap HOST=foo.example.com chef-solo:attributes
+    % cap HOST=foo1.example.com chef-solo:attributes
 
 
 ## Reference
