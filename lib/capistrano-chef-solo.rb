@@ -122,7 +122,7 @@ module Capistrano
 
           # FIXME:
           # Some variables (such like :default_environment set by capistrano-rbenv) may be
-          # initialized without bootstrap settings during `on :start`.
+          # initialized without bootstrap settings during `on :load`.
           # Is there any way to avoid this without setting `:rbenv_setup_default_environment`
           # as false?
           set(:rbenv_setup_default_environment, false)
