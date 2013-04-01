@@ -217,19 +217,15 @@ module Capistrano
           end
 
           def update_cookbooks(options={})
-            tmpdir = run_locally("mktemp -d /tmp/chef-solo.XXXXXXXXXX").strip
-            remote_tmpdir = capture("mktemp -d /tmp/chef-solo.XXXXXXXXXX").strip
-            destination = File.join(tmpdir, "cookbooks")
-            remote_destination = File.join(chef_solo_path, "cookbooks")
-            filename = File.join(tmpdir, "cookbooks.tar.gz")
-            remote_filename = File.join(remote_tmpdir, "cookbooks.tar.gz")
-            begin
-              bundle_cookbooks(filename, destination)
-              run("mkdir -p #{remote_tmpdir.dump}")
-              distribute_cookbooks(filename, remote_filename, remote_destination)
-            ensure
-              run("rm -rf #{remote_tmpdir.dump}") rescue nil
-              run_locally("rm -rf #{tmpdir.dump}") rescue nil
+            _normalize_cookbooks(chef_solo_cookbooks).each do |name, variables|
+              begin
+                tmpdir = capture("mktemp -d /tmp/cookbooks.XXXXXXXXXX", options).strip
+                run("rm -rf #{tmpdir.dump} && mkdir -p #{tmpdir.dump}", options)
+                deploy_cookbooks(name, tmpdir, variables, options)
+                install_cookbooks(name, tmpdir, File.join(chef_solo_path, "cookbooks"), options)
+              ensure
+                run("rm -rf #{tmpdir.dump}", options)
+              end
             end
           end
 
@@ -239,10 +235,11 @@ module Capistrano
           #
           _cset(:chef_solo_cookbooks_name) { application }
           _cset(:chef_solo_cookbooks_scm, :none)
+          _cset(:chef_solo_cookbooks_subdir, "config/cookbooks")
           _cset(:chef_solo_cookbooks) {
             cookbooks = {}
             cookbooks[chef_solo_cookbooks_name] = {}
-            cookbooks[chef_solo_cookbooks_name][:cookbooks] = fetch(:chef_solo_cookbooks_subdir, "config/cookbooks")
+            cookbooks[chef_solo_cookbooks_name][:deploy_subdir] = chef_solo_cookbooks_subdir
             cookbooks[chef_solo_cookbooks_name][:repository] = fetch(:chef_solo_cookbooks_repository) if exists?(:chef_solo_cookbooks_repository)
             cookbooks[chef_solo_cookbooks_name][:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
             cookbooks
@@ -250,73 +247,58 @@ module Capistrano
 
           _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
           def _normalize_cookbooks(cookbooks)
-            xs = cookbooks.map { |name, options|
-              options[:scm] ||= chef_solo_cookbooks_scm
-              options[:cookbooks_exclude] ||= chef_solo_cookbooks_exclude
-              [name, options]
+            xs = cookbooks.map { |name, variables|
+              variables[:scm] ||= chef_solo_cookbooks_scm
+              variables[:cookbooks_exclude] ||= chef_solo_cookbooks_exclude
+              ## variables for capistrano-copy-subdir
+              variables[:deploy_via] ||= :copy_subdir
+              variables[:deploy_subdir] ||= variables.fetch(:cookbooks, chef_solo_cookbooks_subdir)
+              [name, variables]
             }
             Hash[xs]
           end
 
           _cset(:chef_solo_repository_cache) { File.expand_path("./tmp/cookbooks-cache") }
-          def bundle_cookbooks(filename, destination)
-            dirs = [ File.dirname(filename), destination ].uniq
-            run_locally("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
-            cookbooks = _normalize_cookbooks(chef_solo_cookbooks)
-            cookbooks.each do |name, options|
-              logger.debug("Retrieving cookbooks `#{name}' via #{options[:scm]}.")
-              case options[:scm].to_sym
-              when :none
-                fetch_cookbooks_none(name, destination, options)
-              else
-                fetch_cookbooks_repository(name, destination, options)
+
+          def deploy_cookbooks(name, destination, variables={}, options={})
+            logger.debug("retrieving cookbooks `#{name}' from #{variables[:repository]} via #{variables[:deploy_via]}.")
+            begin
+              releases_path = capture("mktemp -d /tmp/releases.XXXXXXXXXX", options).strip
+              release_path = File.join(releases_path, release_name)
+              run("rm -rf #{releases_path.dump} && mkdir -p #{releases_path.dump}", options)
+              c = _middle_copy(top)
+              c.instance_eval do
+                set(:deploy_to, File.dirname(releases_path))
+                set(:releases_path, releases_path)
+                set(:release_path, release_path)
+                set(:revision) { source.head }
+                set(:source) { ::Capistrano::Deploy::SCM.new(scm, self) }
+                set(:real_revision) { source.local.query_revision(revision) { |cmd| with_env("LC_ALL", "C") { run_locally(cmd) } } }
+                set(:strategy) { ::Capistrano::Deploy::Strategy.new(deploy_via, self) }
+                variables.each do |key, val|
+                  set(key, val)
+                end
+                strategy.deploy!
               end
-            end
-            run_locally("cd #{File.dirname(destination).dump} && tar chzf #{filename.dump} #{File.basename(destination).dump}")
-          end
-
-          def _fetch_cookbook(source, destination, options)
-            exclusions = options.fetch(:cookbooks_exclude, []).map { |e| "--exclude=#{e.dump}" }.join(" ")
-            run_locally("rsync -lrpt #{exclusions} #{source}/ #{destination}")
-          end
-
-          def _fetch_cookbooks(source, destination, options)
-            cookbooks = [ options.fetch(:cookbooks, "/") ].flatten.compact
-            cookbooks.each do |cookbook|
-              _fetch_cookbook(File.join(source, cookbook), destination, options)
+              run("rsync -lrpt #{(release_path + "/").dump} #{destination.dump}", options)
+            ensure
+              run("rm -rf #{releases_path.dump}", options)
             end
           end
 
-          def fetch_cookbooks_none(name, destination, options={})
-            _fetch_cookbooks(options.fetch(:repository, "."), destination, options)
+          def _middle_copy(object)
+            o = object.clone
+            object.instance_variables.each do |k|
+              v = object.instance_variable_get(k)
+              o.instance_variable_set(k, v ? v.clone : v)
+            end
+            o
           end
 
-          def fetch_cookbooks_repository(name, destination, options={})
-            configuration = Capistrano::Configuration.new
-            # refreshing just :source, :revision and :real_revision is enough?
-            options = {
-              :source => lambda { Capistrano::Deploy::SCM.new(configuration[:scm], configuration) },
-              :revision => lambda { configuration[:source].head },
-              :real_revision => lambda {
-                configuration[:source].local.query_revision(configuration[:revision]) { |cmd| with_env("LC_ALL", "C") { run_locally(cmd) } }
-              },
-            }.merge(options)
-            variables.merge(options).each do |key, val|
-              configuration.set(key, val)
-            end
-            repository_cache = File.join(chef_solo_repository_cache, name)
-            if File.exist?(repository_cache)
-              run_locally(configuration[:source].sync(configuration[:real_revision], repository_cache))
-            else
-              run_locally(configuration[:source].checkout(configuration[:real_revision], repository_cache))
-            end
-            _fetch_cookbooks(repository_cache, destination, options)
-          end
-
-          def distribute_cookbooks(filename, remote_filename, remote_destination)
-            top.upload(filename, remote_filename)
-            run("rm -rf #{remote_destination.dump}")
-            run("cd #{File.dirname(remote_destination).dump} && tar xzf #{remote_filename.dump}")
+          def install_cookbooks(name, source, destination, options={})
+            logger.debug("installing cookbooks `#{name}' to #{destination}.")
+            run("mkdir -p #{source.dump} #{destination.dump}", options)
+            run("rsync -lrpt #{(source + "/").dump} #{destination.dump}", options)
           end
 
           _cset(:chef_solo_config) {
