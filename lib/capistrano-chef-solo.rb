@@ -264,6 +264,7 @@ module Capistrano
             run_locally("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
             cookbooks = _normalize_cookbooks(chef_solo_cookbooks)
             cookbooks.each do |name, options|
+              logger.debug("Retrieving cookbooks `#{name}' via #{options[:scm]}.")
               case options[:scm].to_sym
               when :none
                 fetch_cookbooks_none(name, destination, options)
@@ -313,7 +314,7 @@ module Capistrano
           end
 
           def distribute_cookbooks(filename, remote_filename, remote_destination)
-            upload(filename, remote_filename)
+            top.upload(filename, remote_filename)
             run("rm -rf #{remote_destination.dump}")
             run("cd #{File.dirname(remote_destination).dump} && tar xzf #{remote_filename.dump}")
           end
@@ -420,12 +421,14 @@ module Capistrano
             run_list = options.delete(:run_list)
             servers = find_servers_for_task(current_task)
             servers.each do |server|
+              logger.debug("Updating chef-solo attributes for #{server.host}.")
               attributes = _generate_attributes(:hosts => server.host, :roles => role_names_for_host(server), :run_list => run_list)
               top.put(_json_attributes(attributes), chef_solo_attributes_file, options.merge(:hosts => server.host))
             end
           end
 
           def invoke(options={})
+            logger.debug("Invoking chef-solo.")
             args = fetch(:chef_solo_options, [])
             args << "-c #{chef_solo_config_file.dump}"
             args << "-j #{chef_solo_attributes_file.dump}"
