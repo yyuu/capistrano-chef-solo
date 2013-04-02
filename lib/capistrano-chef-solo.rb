@@ -274,7 +274,7 @@ module Capistrano
               releases_path = capture("mktemp -d /tmp/releases.XXXXXXXXXX", options).strip
               release_path = File.join(releases_path, release_name)
               run("rm -rf #{releases_path.dump} && mkdir -p #{releases_path.dump}", options)
-              c = _middle_copy(top)
+              c = _middle_copy(top) # create new configuration with separated @variables
               c.instance_eval do
                 set(:deploy_to, File.dirname(releases_path))
                 set(:releases_path, releases_path)
@@ -411,14 +411,14 @@ module Capistrano
             run_list = options.delete(:run_list)
             servers = find_servers_for_task(current_task)
             servers.each do |server|
-              logger.debug("Updating chef-solo attributes for #{server.host}.")
+              logger.debug("updating chef-solo attributes for #{server.host}.")
               attributes = _generate_attributes(:hosts => server.host, :roles => role_names_for_host(server), :run_list => run_list)
               top.put(_json_attributes(attributes), chef_solo_attributes_file, options.merge(:hosts => server.host))
             end
           end
 
           def invoke(options={})
-            logger.debug("Invoking chef-solo.")
+            logger.debug("invoking chef-solo.")
             args = fetch(:chef_solo_options, [])
             args << "-c #{chef_solo_config_file.dump}"
             args << "-j #{chef_solo_attributes_file.dump}"
