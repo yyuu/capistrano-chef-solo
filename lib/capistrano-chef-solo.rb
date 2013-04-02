@@ -252,6 +252,7 @@ module Capistrano
             { chef_solo_cookbooks_name => variables }
           }
 
+          _cset(:chef_solo_repository_cache) { File.expand_path("tmp/cookbooks-cache") }
           def _normalize_cookbooks(cookbooks)
             xs = cookbooks.map { |name, variables|
               variables = chef_solo_cookbooks_default_variables.merge(variables)
@@ -259,14 +260,12 @@ module Capistrano
               # use :cookbooks as :deploy_subdir for backward compatibility with prior than 0.1.2
               variables[:deploy_subdir] ||= variables[:cookbooks]
               if variables[:scm] != :none
-                variables[:copy_cache] ||= File.expand_path(name, "tmp/cookbooks-cache")
+                variables[:copy_cache] ||= File.expand_path(name, chef_solo_repository_cache)
               end
               [name, variables]
             }
             Hash[xs]
           end
-
-          _cset(:chef_solo_repository_cache) { File.expand_path("./tmp/cookbooks-cache") }
 
           def deploy_cookbooks(name, destination, variables={}, options={})
             logger.debug("retrieving cookbooks `#{name}' from #{variables[:repository]} via #{variables[:deploy_via]}.")
