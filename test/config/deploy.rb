@@ -59,13 +59,16 @@ def check_applied_recipes!(expected)
   end
 end
 
-def flush_attributes!()
+def reset_chef_solo!()
   set(:chef_solo_attributes, {})
   set(:chef_solo_role_attributes, {})
   set(:chef_solo_host_attributes, {})
   set(:chef_solo_run_list, [])
   set(:chef_solo_role_run_list, {})
   set(:chef_solo_host_run_list, {})
+  variables.each_key do |key|
+    reset!(key) if /^chef_solo/ =~ key
+  end
 end
 
 namespace(:test_default) {
@@ -78,7 +81,7 @@ namespace(:test_default) {
   after "test_default", "test_default:teardown"
 
   task(:setup) {
-    flush_attributes!
+    reset_chef_solo!
     set(:chef_solo_attributes, {"aaa" => "AAA"})
     set(:chef_solo_role_attributes, {:app => {"bbb" => "BBB"}})
     set(:chef_solo_host_attributes, {"192.168.33.10" => {"ccc" => "CCC"}})
@@ -116,12 +119,11 @@ namespace(:test_with_local_cookbooks) {
   after "test_with_local_cookbooks", "test_with_local_cookbooks:teardown"
 
   task(:setup) {
-    flush_attributes!
+    reset_chef_solo!
     set(:chef_solo_run_list, %w(recipe[foo] recipe[bar]))
     set(:chef_solo_cookbooks_scm, :none)
     set(:chef_solo_cookbooks_repository, File.expand_path("..", File.dirname(__FILE__)))
     set(:chef_solo_cookbooks_subdir, "config/cookbooks")
-    reset!(:chef_solo_cookbooks)
   }
 
   task(:teardown) {
@@ -152,13 +154,12 @@ namespace(:test_with_remote_cookbooks) {
   after "test_with_remote_cookbooks", "test_with_remote_cookbooks:teardown"
 
   task(:setup) {
-    flush_attributes!
+    reset_chef_solo!
     set(:chef_solo_run_list, %w(recipe[one] recipe[two]))
     set(:chef_solo_cookbooks_scm, :git)
     set(:chef_solo_cookbooks_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
     set(:chef_solo_cookbooks_revision, "develop")
     set(:chef_solo_cookbooks_subdir, "test/config/cookbooks-ext")
-    reset!(:chef_solo_cookbooks)
   }
 
   task(:teardown) {
@@ -189,7 +190,7 @@ namespace(:test_with_multiple_cookbooks) {
   after "test_with_multiple_cookbooks", "test_with_multiple_cookbooks:teardown"
 
   task(:setup) {
-    flush_attributes!
+    reset_chef_solo!
     set(:chef_solo_run_list, %w(recipe[bar] recipe[baz] recipe[two] recipe[three]))
     set(:chef_solo_cookbooks) {{
       "local" => {
@@ -204,7 +205,6 @@ namespace(:test_with_multiple_cookbooks) {
         :cookbooks => "test/config/cookbooks-ext",
       },
     }}
-#   reset!(:chef_solo_cookbooks)
   }
 
   task(:teardown) {
