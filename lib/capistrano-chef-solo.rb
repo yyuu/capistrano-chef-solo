@@ -234,25 +234,33 @@ module Capistrano
           # By default, load cookbooks from local path of "config/cookbooks".
           #
           _cset(:chef_solo_cookbooks_name) { application }
-          _cset(:chef_solo_cookbooks_scm, :none)
-          _cset(:chef_solo_cookbooks_subdir, "config/cookbooks")
+          _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
+          _cset(:chef_solo_cookbooks_default_variables) {{
+            :scm => :none,
+            :deploy_via => :copy_subdir,
+            :deploy_subdir => nil,
+            :repository => ".",
+            :cookbooks_exclude => chef_solo_cookbooks_exclude,
+            :copy_cache => nil,
+          }}
           _cset(:chef_solo_cookbooks) {
-            cookbooks = {}
-            cookbooks[chef_solo_cookbooks_name] = {}
-            cookbooks[chef_solo_cookbooks_name][:deploy_subdir] = chef_solo_cookbooks_subdir
-            cookbooks[chef_solo_cookbooks_name][:repository] = fetch(:chef_solo_cookbooks_repository) if exists?(:chef_solo_cookbooks_repository)
-            cookbooks[chef_solo_cookbooks_name][:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
-            cookbooks
+            variables = chef_solo_cookbooks_default_variables.dup
+            variables[:scm] = fetch(:chef_solo_cookbooks_scm) if exists?(:chef_solo_cookbooks_scm)
+            variables[:deploy_subdir] = fetch(:chef_solo_cookbooks_subdir, "config/cookbooks")
+            variables[:repository] = fetch(:chef_solo_cookbooks_repository) if exists?("chef_solo_cookbooks_repository")
+            variables[:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
+            { chef_solo_cookbooks_name => variables }
           }
 
-          _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
           def _normalize_cookbooks(cookbooks)
             xs = cookbooks.map { |name, variables|
-              variables[:scm] ||= chef_solo_cookbooks_scm
-              variables[:cookbooks_exclude] ||= chef_solo_cookbooks_exclude
-              ## variables for capistrano-copy-subdir
-              variables[:deploy_via] ||= :copy_subdir
-              variables[:deploy_subdir] ||= variables.fetch(:cookbooks, chef_solo_cookbooks_subdir)
+              variables = chef_solo_cookbooks_default_variables.merge(variables)
+              variables[:application] ||= name
+              # use :cookbooks as :deploy_subdir for backward compatibility with prior than 0.1.2
+              variables[:deploy_subdir] ||= variables[:cookbooks]
+              if variables[:scm] != :none
+                variables[:copy_cache] ||= File.expand_path(name, "tmp/cookbooks-cache")
+              end
               [name, variables]
             }
             Hash[xs]
