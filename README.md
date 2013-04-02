@@ -107,14 +107,14 @@ set(:chef_solo_cookbooks) {{
   # use cookbooks in ./config/cookbooks.
   "local" => {
     :scm => :none,
-    :cookbooks => "config/cookbooks",
+    :deploy_subdir => "config/cookbooks",
   },
   # use cookbooks in git repository.
   "repository" => {
     :scm => :git,
     :repository => "git://example.com/example.git",
     :revision => "master",
-    :cookbooks => "/",
+    :deploy_subdir => "/",
   }
 }}
 ```
