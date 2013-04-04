@@ -93,7 +93,19 @@ You can use cookbooks in remote repository.
 
 ```ruby
 set(:chef_solo_cookbooks_scm, :git)
-set(:chef_solo_cookbooks_repository, "git://example.com/example.git")
+set(:chef_solo_cookbooks_repository, "git://github.com/opscode/cookbooks.git")
+set(:chef_solo_cookbooks_revision, "master")
+set(:chef_solo_cookbooks_subdir, "/")
+```
+
+#### Using single cookbook in remote repository
+
+Also you can use single cookbook in remote repository.
+
+```ruby
+set(:chef_solo_cookbook_name, "python")
+set(:chef_solo_cookbooks_scm, :git)
+set(:chef_solo_cookbooks_repository, "git://github.com/opscode-cookbooks/python.git")
 set(:chef_solo_cookbooks_revision, "master")
 set(:chef_solo_cookbooks_subdir, "/")
 ```
@@ -105,17 +117,22 @@ You can use multiple cookbooks repositories at once.
 ```ruby
 set(:chef_solo_cookbooks) {{
   # use cookbooks in ./config/cookbooks.
-  "local" => {
+  application => {
     :scm => :none,
     :deploy_subdir => "config/cookbooks",
   },
   # use cookbooks in git repository.
-  "repository" => {
+  "cookbooks" => {
     :scm => :git,
-    :repository => "git://example.com/example.git",
+    :repository => "git://github.com/opscode/cookbooks.git",
     :revision => "master",
-    :deploy_subdir => "/",
-  }
+  },
+  "python" => {
+    :cookbook_name => "python",
+    :scm => :git,
+    :repository => "git://github.com/opscode-cookbooks/python.git",
+    :revision => "master",
+  },
 }}
 ```
 

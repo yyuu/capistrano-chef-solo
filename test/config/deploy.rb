@@ -198,7 +198,13 @@ namespace(:test_with_multiple_cookbooks) {
         :repository => File.expand_path("..", File.dirname(__FILE__)),
         :cookbooks => "config/cookbooks",
       },
-      chef_solo_cookbooks_name => {
+      "single" => {
+        :cookbook_name => "single",
+        :scm => :none,
+        :repository => File.expand_path("..", File.dirname(__FILE__)),
+        :cookbooks => "config/cookbook",
+      },
+      application => {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
         :revision => "develop",
@@ -218,7 +224,7 @@ namespace(:test_with_multiple_cookbooks) {
   }
 
   task(:test_run_list) {
-    expected = %w(recipe[foo] recipe[one])
+    expected = %w(recipe[foo] recipe[single] recipe[one])
     chef_solo.run_list expected
     assert_run_list(expected)
     check_applied_recipes!(expected)

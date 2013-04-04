@@ -233,7 +233,6 @@ module Capistrano
           # The definition of cookbooks.
           # By default, load cookbooks from local path of "config/cookbooks".
           #
-          _cset(:chef_solo_cookbooks_name) { application }
           _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
           _cset(:chef_solo_cookbooks_default_variables) {{
             :scm => :none,
@@ -249,7 +248,15 @@ module Capistrano
             variables[:deploy_subdir] = fetch(:chef_solo_cookbooks_subdir, "config/cookbooks")
             variables[:repository] = fetch(:chef_solo_cookbooks_repository) if exists?("chef_solo_cookbooks_repository")
             variables[:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
-            { chef_solo_cookbooks_name => variables }
+            if exists?(:chef_solo_cookbook_name)
+              # deploy as single cookbook
+              name = fetch(:chef_solo_cookbook_name)
+              { name => variables.merge(:cookbook_name => name) }
+            else
+              # deploy as multiple cookbooks
+              name = fetch(:chef_solo_cookbooks_name, application)
+              { name => variables }
+            end
           }
 
           _cset(:chef_solo_repository_cache) { File.expand_path("tmp/cookbooks-cache") }
@@ -287,7 +294,14 @@ module Capistrano
                 end
                 strategy.deploy!
               end
-              run("rsync -lrpt #{(release_path + "/").dump} #{destination.dump}", options)
+              if variables.key?(:cookbook_name)
+                # deploy as single cookbook
+                final_destination = File.join(destination, variables[:cookbook_name])
+              else
+                # deploy as multiple cookbooks
+                final_destination = destination
+              end
+              run("rsync -lrpt #{(release_path + "/").dump} #{final_destination.dump}", options)
             ensure
               run("rm -rf #{releases_path.dump}", options)
             end
