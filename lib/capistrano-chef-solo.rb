@@ -109,6 +109,9 @@ module Capistrano
                 begin
                   activated = _activate_settings(servers)
                   yield
+                rescue => error
+                  logger.info("could not connect with bootstrap settings: #{error}")
+                  raise
                 ensure
                   _deactivate_settings(servers) if activated
                 end
