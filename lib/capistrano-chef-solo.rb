@@ -37,6 +37,7 @@ module Capistrano
           _cset(:chef_solo_cache_path) { File.join(chef_solo_path, "cache") }
           _cset(:chef_solo_config_path) { File.join(chef_solo_path, "config") }
           _cset(:chef_solo_cookbooks_path) { File.join(chef_solo_path, "cookbooks") }
+          _cset(:chef_solo_data_bags_path) { File.join(chef_solo_path, "data_bags") }
           _cset(:chef_solo_config_file) { File.join(chef_solo_config_path, "solo.rb") }
           _cset(:chef_solo_attributes_file) { File.join(chef_solo_config_path, "solo.json") }
 
@@ -217,6 +218,7 @@ module Capistrano
  
           def update(options={})
             update_cookbooks(options)
+            update_data_bags(options)
             update_attributes(options)
             update_config(options)
           end
@@ -225,6 +227,13 @@ module Capistrano
             repos = _normalize_cookbooks(chef_solo_cookbooks)
             _install_repos(:cookbooks, repos, chef_solo_cookbooks_path, options) do |name, tmpdir, variables|
               deploy_cookbooks(name, tmpdir, variables, options)
+            end
+          end
+
+          def update_data_bags(options={})
+            repos = _normalize_data_bags(chef_solo_data_bags)
+            _install_repos(:data_bags, repos, chef_solo_data_bags_path, options) do |name, tmpdir, variables|
+              deploy_data_bags(name, tmpdir, variables, options)
             end
           end
 
@@ -247,6 +256,7 @@ module Capistrano
           end
 
           _cset(:chef_solo_repository_cache) { File.expand_path("tmp") }
+          _cset(:chef_solo_repository_exclude, %w(.hg .git .svn))
           _cset(:chef_solo_repository_variables) {{
             :scm => :none,
             :deploy_via => :copy_subdir,
@@ -259,15 +269,29 @@ module Capistrano
           # The definition of cookbooks.
           # By default, load cookbooks from local path of "config/cookbooks".
           #
-          _cset(:chef_solo_cookbooks_variables) {
-            chef_solo_repository_variables.merge(:copy_exclude => fetch(:chef_solo_cookbooks_exclude, %w(.hg .git .svn)))
-          }
+          _cset(:chef_solo_cookbooks_exclude) { chef_solo_repository_exclude }
+          _cset(:chef_solo_cookbooks_variables) { chef_solo_repository_variables.merge(:copy_exclude => chef_solo_cookbooks_exclude) }
           _cset(:chef_solo_cookbooks) { _default_repos(:cookbook, chef_solo_cookbooks_variables) }
           _cset(:chef_solo_cookbooks_cache) { File.join(chef_solo_repository_cache, "cookbooks-cache") }
           def _normalize_cookbooks(repos)
             _normalize_repos(repos, chef_solo_cookbooks_cache, chef_solo_cookbooks_variables) { |name, variables|
               variables[:deploy_subdir] ||= variables[:cookbooks] # use :cookbooks as :deploy_subdir for backward compatibility with prior than 0.1.2
               variables[:copy_exclude] ||= variables[:cookbooks_exclude]
+            }
+          end
+
+          #
+          # The definition of data_bags.
+          # By default, load data_bags from local path of "config/data_bags".
+          #
+          _cset(:chef_solo_data_bags_exclude) { chef_solo_repository_exclude }
+          _cset(:chef_solo_data_bags_variables) { chef_solo_repository_variables.merge(:copy_exclude => chef_solo_data_bags_exclude) }
+          _cset(:chef_solo_data_bags) { _default_repos(:data_bag, chef_solo_data_bags_variables) }
+          _cset(:chef_solo_data_bags_cache) { File.join(chef_solo_repository_cache, "data_bags-cache") }
+          def _normalize_data_bags(repos)
+            _normalize_repos(repos, chef_solo_data_bags_cache, chef_solo_data_bags_variables) { |name, variables|
+              variables[:deploy_subdir] ||= variables[:data_bags] # use :data_bags as :deploy_subdir for backward compatibility with prior than 0.1.2
+              variables[:copy_exclude] ||= variables[:data_bags_exclude]
             }
           end
 
@@ -353,6 +377,7 @@ module Capistrano
             (<<-EOS).gsub(/^\s*/, "")
               file_cache_path #{chef_solo_cache_path.dump}
               cookbook_path #{chef_solo_cookbooks_path.dump}
+              data_bag_path #{chef_solo_data_bags_path.dump}
             EOS
           }
           def update_config(options={})

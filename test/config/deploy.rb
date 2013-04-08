@@ -32,14 +32,18 @@ task(:test_all) {
   find_and_execute_task("test_without_bootstrap")
 }
 
-def download_attributes()
-  tempfile = Tempfile.new("attributes")
-  download(chef_solo_attributes_file, tempfile.path)
-  JSON.load(tempfile.read)
+def get_file(file, options={})
+  tempfile = Tempfile.new("capistrano-chef-solo")
+  top.get(file, tempfile.path, options)
+  tempfile.read
 end
 
-def assert_attributes(expected)
-  found = download_attributes
+def get_attributes(options={})
+  JSON.load(get_file(chef_solo_attributes_file, options))
+end
+
+def assert_attributes(expected, options={})
+  found = get_attributes(options)
   expected.each do |key, value|
     if found[key] != value
       abort("invalid attribute: #{key.inspect} (expected:#{value.inspect} != found:#{found[key].inspect})")
@@ -47,19 +51,48 @@ def assert_attributes(expected)
   end
 end
 
-def assert_run_list(expected)
-  found = download_attributes["run_list"]
+def assert_run_list(expected, options={})
+  found = get_attributes(options)["run_list"]
   abort("invalid run_list (expected:#{expected.inspect} != found:#{found.inspect})") if found != expected
 end
 
-def check_applied_recipes!(expected)
-  files = expected.map { |recipe| /^recipe\[(\w+)\]$/ =~ recipe; File.join("/tmp", $1) }
-  begin
-    files.each do |file|
-      run("test -f #{file.dump}")
+def assert_file_exists(file, options={})
+  run("test -f #{file.dump}", options)
+rescue
+  abort("assert_file_exists(#{file}) failed.")
+end
+
+def assert_file_content(file, content, options={})
+  remote_content = get_file(file, options)
+  abort("assert_file_content(#{file}) failed. (expected=#{content.inspect}, got=#{remote_content.inspect})") if content != remote_content
+end
+
+def recipe_name(recipe)
+  if /^recipe\[(\w+)\]$/ =~ recipe
+    $1
+  else
+    abort("not a recipe: #{recipe}")
+  end
+end
+
+def recipe_filename(recipe)
+  File.join("/tmp", recipe_name(recipe))
+end
+
+def recipe_content(recipe)
+  recipe_name(recipe).upcase
+end
+
+def _test_recipes(recipes, options={})
+  recipes.each do |recipe|
+    file = recipe_filename(recipe)
+    body = recipe_content(recipe)
+    begin
+      assert_file_exists(file, options)
+      assert_file_content(file, body, options)
+    ensure
+      sudo("rm -f #{file.dump}", options) rescue nil
     end
-  ensure
-    sudo("rm -f #{files.map { |x| x.dump }.join(" ")}") rescue nil
   end
 end
 
@@ -128,6 +161,9 @@ namespace(:test_with_local_cookbooks) {
     set(:chef_solo_cookbooks_scm, :none)
     set(:chef_solo_cookbooks_repository, File.expand_path("..", File.dirname(__FILE__)))
     set(:chef_solo_cookbooks_subdir, "config/cookbooks")
+    set(:chef_solo_data_bags_scm, :none)
+    set(:chef_solo_data_bags_repository, File.expand_path("..", File.dirname(__FILE__)))
+    set(:chef_solo_data_bags_subdir, "config/data_bags")
   }
 
   task(:teardown) {
@@ -137,14 +173,14 @@ namespace(:test_with_local_cookbooks) {
     expected = chef_solo_run_list
     find_and_execute_task("chef-solo")
     assert_run_list(expected)
-    check_applied_recipes!(expected)
+    _test_recipes(expected)
   }
 
   task(:test_run_list) {
     expected = %w(recipe[baz])
     chef_solo.run_list expected
     assert_run_list(expected)
-    check_applied_recipes!(expected)
+    _test_recipes(expected)
   }
 }
 
@@ -162,8 +198,12 @@ namespace(:test_with_remote_cookbooks) {
     set(:chef_solo_run_list, %w(recipe[one] recipe[two]))
     set(:chef_solo_cookbooks_scm, :git)
     set(:chef_solo_cookbooks_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
-    set(:chef_solo_cookbooks_revision, "develop")
+    set(:chef_solo_cookbooks_revision, "support-data-bags2")
     set(:chef_solo_cookbooks_subdir, "test/config/cookbooks-ext")
+    set(:chef_solo_data_bags_scm, :git)
+    set(:chef_solo_data_bags_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
+    set(:chef_solo_data_bags_revision, "support-data-bags2")
+    set(:chef_solo_data_bags_subdir, "test/config/data_bags-ext")
   }
 
   task(:teardown) {
@@ -173,14 +213,14 @@ namespace(:test_with_remote_cookbooks) {
     expected = chef_solo_run_list
     find_and_execute_task("chef-solo")
     assert_run_list(expected)
-    check_applied_recipes!(expected)
+    _test_recipes(expected)
   }
 
   task(:test_run_list) {
     expected = %w(recipe[three])
     chef_solo.run_list expected
     assert_run_list(expected)
-    check_applied_recipes!(expected)
+    _test_recipes(expected)
   }
 }
 
@@ -211,8 +251,27 @@ namespace(:test_with_multiple_cookbooks) {
       application => {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
-        :revision => "develop",
+        :revision => "support-data-bags2",
         :cookbooks => "test/config/cookbooks-ext",
+      },
+    }}
+    set(:chef_solo_data_bags) {{
+      "local" => {
+        :scm => :none,
+        :repository => File.expand_path("..", File.dirname(__FILE__)),
+        :data_bags => "config/data_bags",
+      },
+      "single" => {
+        :data_bag_name => "single",
+        :scm => :none,
+        :repository => File.expand_path("..", File.dirname(__FILE__)),
+        :data_bags => "config/data_bag",
+      },
+      application => {
+        :scm => :git,
+        :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
+        :revision => "support-data-bags2",
+        :data_bags => "test/config/data_bags-ext",
       },
     }}
   }
@@ -224,14 +283,14 @@ namespace(:test_with_multiple_cookbooks) {
     expected = chef_solo_run_list
     find_and_execute_task("chef-solo")
     assert_run_list(expected)
-    check_applied_recipes!(expected)
+    _test_recipes(expected)
   }
 
   task(:test_run_list) {
     expected = %w(recipe[foo] recipe[single] recipe[one])
     chef_solo.run_list expected
     assert_run_list(expected)
-    check_applied_recipes!(expected)
+    _test_recipes(expected)
   }
 }
 
