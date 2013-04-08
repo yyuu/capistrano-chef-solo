@@ -128,6 +128,9 @@ namespace(:test_with_local_cookbooks) {
     set(:chef_solo_cookbooks_scm, :none)
     set(:chef_solo_cookbooks_repository, File.expand_path("..", File.dirname(__FILE__)))
     set(:chef_solo_cookbooks_subdir, "config/cookbooks")
+    set(:chef_solo_data_bags_scm, :none)
+    set(:chef_solo_data_bags_repository, File.expand_path("..", File.dirname(__FILE__)))
+    set(:chef_solo_data_bags_subdir, "config/data_bags")
   }
 
   task(:teardown) {
@@ -162,8 +165,12 @@ namespace(:test_with_remote_cookbooks) {
     set(:chef_solo_run_list, %w(recipe[one] recipe[two]))
     set(:chef_solo_cookbooks_scm, :git)
     set(:chef_solo_cookbooks_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
-    set(:chef_solo_cookbooks_revision, "develop")
+    set(:chef_solo_cookbooks_revision, "support-data-bags")
     set(:chef_solo_cookbooks_subdir, "test/config/cookbooks-ext")
+    set(:chef_solo_data_bags_scm, :git)
+    set(:chef_solo_data_bags_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
+    set(:chef_solo_data_bags_revision, "support-data-bags")
+    set(:chef_solo_data_bags_subdir, "test/config/data_bags")
   }
 
   task(:teardown) {
@@ -211,8 +218,27 @@ namespace(:test_with_multiple_cookbooks) {
       application => {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
-        :revision => "develop",
+        :revision => "support-data-bags",
         :cookbooks => "test/config/cookbooks-ext",
+      },
+    }}
+    set(:chef_solo_data_bags) {{
+      "local" => {
+        :scm => :none,
+        :repository => File.expand_path("..", File.dirname(__FILE__)),
+        :data_bags => "config/data_bags",
+      },
+      "single" => {
+        :data_bag_name => "single",
+        :scm => :none,
+        :repository => File.expand_path("..", File.dirname(__FILE__)),
+        :data_bags => "config/data_bag",
+      },
+      application => {
+        :scm => :git,
+        :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
+        :revision => "support-data-bags",
+        :data_bags => "test/config/data_bags-ext",
       },
     }}
   }
