@@ -198,11 +198,11 @@ namespace(:test_with_remote_cookbooks) {
     set(:chef_solo_run_list, %w(recipe[one] recipe[two]))
     set(:chef_solo_cookbooks_scm, :git)
     set(:chef_solo_cookbooks_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
-    set(:chef_solo_cookbooks_revision, "support-data-bags")
+    set(:chef_solo_cookbooks_revision, "support-data-bags2")
     set(:chef_solo_cookbooks_subdir, "test/config/cookbooks-ext")
     set(:chef_solo_data_bags_scm, :git)
     set(:chef_solo_data_bags_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
-    set(:chef_solo_data_bags_revision, "support-data-bags")
+    set(:chef_solo_data_bags_revision, "support-data-bags2")
     set(:chef_solo_data_bags_subdir, "test/config/data_bags-ext")
   }
 
@@ -251,7 +251,7 @@ namespace(:test_with_multiple_cookbooks) {
       application => {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
-        :revision => "support-data-bags",
+        :revision => "support-data-bags2",
         :cookbooks => "test/config/cookbooks-ext",
       },
     }}
@@ -270,7 +270,7 @@ namespace(:test_with_multiple_cookbooks) {
       application => {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
-        :revision => "support-data-bags",
+        :revision => "support-data-bags2",
         :data_bags => "test/config/data_bags-ext",
       },
     }}
