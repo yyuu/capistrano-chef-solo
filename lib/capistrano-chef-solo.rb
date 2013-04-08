@@ -244,8 +244,8 @@ module Capistrano
             :deploy_via => :copy_subdir,
             :deploy_subdir => nil,
             :repository => ".",
-            :cookbooks_exclude => chef_solo_cookbooks_exclude,
             :copy_cache => nil,
+            :copy_exclude => chef_solo_cookbooks_exclude,
           }}
           _cset(:chef_solo_cookbooks) {
             variables = chef_solo_cookbooks_default_variables.dup
@@ -274,6 +274,7 @@ module Capistrano
               if variables[:scm] != :none
                 variables[:copy_cache] ||= File.expand_path(name, chef_solo_repository_cache)
               end
+              variables[:copy_exclude] ||= variables[:cookbooks_exclude]
               [name, variables]
             }
             Hash[xs]
