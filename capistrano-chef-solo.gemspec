@@ -19,7 +19,5 @@ Gem::Specification.new do |gem|
   gem.add_dependency("capistrano", ">= 2.10.0")
   gem.add_dependency("capistrano-copy-subdir", ">= 0.1.0")
   gem.add_dependency("capistrano-rbenv", ">= 1.0.0")
-  gem.add_development_dependency("net-scp", "~> 1.0.4")
-  gem.add_development_dependency("net-ssh", "~> 2.2.2")
   gem.add_development_dependency("vagrant", "~> 1.0.6")
 end
