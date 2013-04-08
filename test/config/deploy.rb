@@ -8,7 +8,11 @@ set :scm, :none
 set :use_sudo, false
 set :user, "vagrant"
 set :password, "vagrant"
-set :ssh_options, {:user_known_hosts_file => "/dev/null"}
+set :ssh_options, {
+  :auth_methods => %w(publickey password),
+  :keys => File.join(ENV["HOME"], ".vagrant.d", "insecure_private_key"),
+  :user_known_hosts_file => "/dev/null",
+}
 
 role :web, "192.168.33.10"
 role :app, "192.168.33.10"
@@ -198,7 +202,13 @@ namespace(:test_with_multiple_cookbooks) {
         :repository => File.expand_path("..", File.dirname(__FILE__)),
         :cookbooks => "config/cookbooks",
       },
-      chef_solo_cookbooks_name => {
+      "single" => {
+        :cookbook_name => "single",
+        :scm => :none,
+        :repository => File.expand_path("..", File.dirname(__FILE__)),
+        :cookbooks => "config/cookbook",
+      },
+      application => {
         :scm => :git,
         :repository => "git://github.com/yyuu/capistrano-chef-solo.git",
         :revision => "develop",
@@ -218,7 +228,7 @@ namespace(:test_with_multiple_cookbooks) {
   }
 
   task(:test_run_list) {
-    expected = %w(recipe[foo] recipe[one])
+    expected = %w(recipe[foo] recipe[single] recipe[one])
     chef_solo.run_list expected
     assert_run_list(expected)
     check_applied_recipes!(expected)
@@ -238,14 +248,19 @@ namespace(:test_with_bootstrap) {
     set(:chef_solo_bootstrap, true)
     set(:chef_solo_bootstrap_user, "bootstrap")
     set(:chef_solo_bootstrap_password, "bootstrap")
+    set(:chef_solo_bootstrap_ssh_options, {
+#     :auth_methods => %w(password), #==> setting :auth_methods throws Net::SSH::AuthenticationFailed (capistrano bug?)
+      :user_known_hosts_file => "/dev/null",
+    })
     run("getent passwd #{chef_solo_bootstrap_user.dump} || " +
         "#{sudo} useradd -m -p #{chef_solo_bootstrap_password.crypt(chef_solo_bootstrap_password).dump} #{chef_solo_bootstrap_user.dump}")
   }
 
   task(:teardown) {
     set(:chef_solo_bootstrap, false)
-    set(:chef_solo_bootstrap_user, nil)
-    set(:chef_solo_bootstrap_password, nil)
+    unset(:chef_solo_bootstrap_user)
+    unset(:chef_solo_bootstrap_password)
+    unset(:chef_solo_bootstrap_ssh_options)
   }
 
   task(:test_connect_with_settings) {
@@ -280,12 +295,14 @@ namespace(:test_without_bootstrap) {
     set(:chef_solo_bootstrap, false)
     set(:chef_solo_bootstrap_user, "bootstrap")
     set(:chef_solo_bootstrap_password, "bootstrap")
+    set(:chef_solo_bootstrap_ssh_options, {:user_known_hosts_file => "/dev/null"})
   }
 
   task(:teardown) {
     set(:chef_solo_bootstrap, false)
-    set(:chef_solo_bootstrap_user, nil)
-    set(:chef_solo_bootstrap_password, nil)
+    unset(:chef_solo_bootstrap_user)
+    unset(:chef_solo_bootstrap_password)
+    unset(:chef_solo_bootstrap_ssh_options)
   }
 
   task(:test_connect_with_settings) {

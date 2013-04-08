@@ -34,9 +34,11 @@ module Capistrano
         namespace(:chef_solo) {
           _cset(:chef_solo_version, "11.4.0")
           _cset(:chef_solo_path) { capture("echo $HOME/chef").strip }
-          _cset(:chef_solo_path_children, %w(bundle cache config cookbooks))
-          _cset(:chef_solo_config_file) { File.join(chef_solo_path, "config", "solo.rb") }
-          _cset(:chef_solo_attributes_file) { File.join(chef_solo_path, "config", "solo.json") }
+          _cset(:chef_solo_cache_path) { File.join(chef_solo_path, "cache") }
+          _cset(:chef_solo_config_path) { File.join(chef_solo_path, "config") }
+          _cset(:chef_solo_cookbooks_path) { File.join(chef_solo_path, "cookbooks") }
+          _cset(:chef_solo_config_file) { File.join(chef_solo_config_path, "solo.rb") }
+          _cset(:chef_solo_attributes_file) { File.join(chef_solo_config_path, "solo.json") }
 
           _cset(:chef_solo_bootstrap_user) {
             if variables.key?(:chef_solo_user)
@@ -109,6 +111,9 @@ module Capistrano
                 begin
                   activated = _activate_settings(servers)
                   yield
+                rescue => error
+                  logger.info("could not connect with bootstrap settings: #{error}")
+                  raise
                 ensure
                   _deactivate_settings(servers) if activated
                 end
@@ -200,7 +205,7 @@ module Capistrano
               installed = false
             end
             unless installed
-              dirs = chef_solo_path_children.map { |dir| File.join(chef_solo_path, dir) }
+              dirs = [ chef_solo_path, chef_solo_cache_path, chef_solo_config_path, chef_solo_cookbooks_path ].uniq
               run("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
               top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
               args = fetch(:chef_solo_bundle_options, [])
@@ -212,8 +217,8 @@ module Capistrano
  
           def update(options={})
             update_cookbooks(options)
-            update_config(options)
             update_attributes(options)
+            update_config(options)
           end
 
           def update_cookbooks(options={})
@@ -222,7 +227,7 @@ module Capistrano
                 tmpdir = capture("mktemp -d /tmp/cookbooks.XXXXXXXXXX", options).strip
                 run("rm -rf #{tmpdir.dump} && mkdir -p #{tmpdir.dump}", options)
                 deploy_cookbooks(name, tmpdir, variables, options)
-                install_cookbooks(name, tmpdir, File.join(chef_solo_path, "cookbooks"), options)
+                install_cookbooks(name, tmpdir, chef_solo_cookbooks_path, options)
               ensure
                 run("rm -rf #{tmpdir.dump}", options)
               end
@@ -233,7 +238,6 @@ module Capistrano
           # The definition of cookbooks.
           # By default, load cookbooks from local path of "config/cookbooks".
           #
-          _cset(:chef_solo_cookbooks_name) { application }
           _cset(:chef_solo_cookbooks_exclude, %w(.hg .git .svn))
           _cset(:chef_solo_cookbooks_default_variables) {{
             :scm => :none,
@@ -249,7 +253,15 @@ module Capistrano
             variables[:deploy_subdir] = fetch(:chef_solo_cookbooks_subdir, "config/cookbooks")
             variables[:repository] = fetch(:chef_solo_cookbooks_repository) if exists?("chef_solo_cookbooks_repository")
             variables[:revision] = fetch(:chef_solo_cookbooks_revision) if exists?(:chef_solo_cookbooks_revision)
-            { chef_solo_cookbooks_name => variables }
+            if exists?(:chef_solo_cookbook_name)
+              # deploy as single cookbook
+              name = fetch(:chef_solo_cookbook_name)
+              { name => variables.merge(:cookbook_name => name) }
+            else
+              # deploy as multiple cookbooks
+              name = fetch(:chef_solo_cookbooks_name, application)
+              { name => variables }
+            end
           }
 
           _cset(:chef_solo_repository_cache) { File.expand_path("tmp/cookbooks-cache") }
@@ -287,7 +299,14 @@ module Capistrano
                 end
                 strategy.deploy!
               end
-              run("rsync -lrpt #{(release_path + "/").dump} #{destination.dump}", options)
+              if variables.key?(:cookbook_name)
+                # deploy as single cookbook
+                final_destination = File.join(destination, variables[:cookbook_name])
+              else
+                # deploy as multiple cookbooks
+                final_destination = destination
+              end
+              run("rsync -lrpt #{(release_path + "/").dump} #{final_destination.dump}", options)
             ensure
               run("rm -rf #{releases_path.dump}", options)
             end
@@ -310,12 +329,12 @@ module Capistrano
 
           _cset(:chef_solo_config) {
             (<<-EOS).gsub(/^\s*/, "")
-              file_cache_path #{File.join(chef_solo_path, "cache").dump}
-              cookbook_path #{File.join(chef_solo_path, "cookbooks").dump}
+              file_cache_path #{chef_solo_cache_path.dump}
+              cookbook_path #{chef_solo_cookbooks_path.dump}
             EOS
           }
           def update_config(options={})
-            top.put(chef_solo_config, chef_solo_config_file)
+            top.put(chef_solo_config, chef_solo_config_file, options)
           end
 
           # merge nested hashes
