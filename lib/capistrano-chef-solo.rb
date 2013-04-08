@@ -351,7 +351,11 @@ module Capistrano
                 set(:real_revision) { source.local.query_revision(revision) { |cmd| with_env("LC_ALL", "C") { run_locally(cmd) } } }
                 set(:strategy) { ::Capistrano::Deploy::Strategy.new(deploy_via, self) }
                 variables.each do |key, val|
-                  set(key, val)
+                  if val.nil?
+                    unset(key)
+                  else
+                    set(key, val)
+                  end
                 end
                 from = File.join(repository, fetch(:deploy_subdir, "/"))
                 to = destination
