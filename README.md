@@ -35,8 +35,12 @@ set(:chef_solo_version, "11.4.0")
 set(:rbenv_ruby_version, "1.9.3-p392")
 ```
 
-And then, now you can start using `chef-solo` via Capistrano.
-This task will deploy cookbooks from `./config/cookbooks`, and then invoke `chef-solo`.
+Then, create directories for your cookbooks and data bags. By default, `capistrano-chef-solo` searches them from `./config`.
+(see examples of [cookbooks](#using-cookbooks) and [data bags](#using-data-bags) for details)
+
+    $ mkdir -p config/cookbooks config/data_bags
+
+Now you can start using `chef-solo` via Capistrano.
 
     $ cap chef-solo
 
@@ -134,6 +138,21 @@ set(:chef_solo_cookbooks) {{
     :revision => "master",
   },
 }}
+```
+
+
+### Using data bags
+
+#### Using data bags in local path
+
+You can manage your data bags as similar as [cookbooks](#using-cookbooks).
+
+By default, `capistrano-chef-solo` searches data bags from local path of `config/data_bags`.
+You can specify the data bags directory with using `chef_solo_data_bags_subdir`.
+
+```ruby
+set(:chef_solo_data_bags_scm, :none)
+set(:chef_solo_data_bags_subdir, "config/data_bags")
 ```
 
 

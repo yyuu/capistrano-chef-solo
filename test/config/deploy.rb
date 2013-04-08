@@ -308,7 +308,7 @@ namespace(:test_with_bootstrap) {
     set(:chef_solo_bootstrap_user, "bootstrap")
     set(:chef_solo_bootstrap_password, "bootstrap")
     set(:chef_solo_bootstrap_ssh_options, {
-#     :auth_methods => %w(password), #==> setting :auth_methods throws Net::SSH::AuthenticationFailed (capistrano bug?)
+#     :auth_methods => %w(password), #==> FIXME: setting :auth_methods throws Net::SSH::AuthenticationFailed (capistrano bug?)
       :user_known_hosts_file => "/dev/null",
     })
     run("getent passwd #{chef_solo_bootstrap_user.dump} || " +
