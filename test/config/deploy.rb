@@ -11,7 +11,7 @@ set :password, "vagrant"
 set :ssh_options, {
   :auth_methods => %w(publickey password),
   :keys => File.join(ENV["HOME"], ".vagrant.d", "insecure_private_key"),
-  :user_known_hosts_file => "/dev/null"
+  :user_known_hosts_file => "/dev/null",
 }
 
 role :web, "192.168.33.10"
@@ -248,14 +248,19 @@ namespace(:test_with_bootstrap) {
     set(:chef_solo_bootstrap, true)
     set(:chef_solo_bootstrap_user, "bootstrap")
     set(:chef_solo_bootstrap_password, "bootstrap")
+    set(:chef_solo_bootstrap_ssh_options, {
+#     :auth_methods => %w(password), #==> setting :auth_methods throws Net::SSH::AuthenticationFailed (capistrano bug?)
+      :user_known_hosts_file => "/dev/null",
+    })
     run("getent passwd #{chef_solo_bootstrap_user.dump} || " +
         "#{sudo} useradd -m -p #{chef_solo_bootstrap_password.crypt(chef_solo_bootstrap_password).dump} #{chef_solo_bootstrap_user.dump}")
   }
 
   task(:teardown) {
     set(:chef_solo_bootstrap, false)
-    set(:chef_solo_bootstrap_user, nil)
-    set(:chef_solo_bootstrap_password, nil)
+    unset(:chef_solo_bootstrap_user)
+    unset(:chef_solo_bootstrap_password)
+    unset(:chef_solo_bootstrap_ssh_options)
   }
 
   task(:test_connect_with_settings) {
@@ -290,12 +295,14 @@ namespace(:test_without_bootstrap) {
     set(:chef_solo_bootstrap, false)
     set(:chef_solo_bootstrap_user, "bootstrap")
     set(:chef_solo_bootstrap_password, "bootstrap")
+    set(:chef_solo_bootstrap_ssh_options, {:user_known_hosts_file => "/dev/null"})
   }
 
   task(:teardown) {
     set(:chef_solo_bootstrap, false)
-    set(:chef_solo_bootstrap_user, nil)
-    set(:chef_solo_bootstrap_password, nil)
+    unset(:chef_solo_bootstrap_user)
+    unset(:chef_solo_bootstrap_password)
+    unset(:chef_solo_bootstrap_ssh_options)
   }
 
   task(:test_connect_with_settings) {
