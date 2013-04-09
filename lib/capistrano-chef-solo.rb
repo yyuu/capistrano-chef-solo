@@ -345,7 +345,7 @@ module Capistrano
               c.instance_eval do
                 set(:deploy_to, File.dirname(releases_path))
                 set(:releases_path, releases_path)
-                set(:release_path, File.join(releases_path, release_name))
+                set(:release_path, release_path)
                 set(:revision) { source.head }
                 set(:source) { ::Capistrano::Deploy::SCM.new(scm, self) }
                 set(:real_revision) { source.local.query_revision(revision) { |cmd| with_env("LC_ALL", "C") { run_locally(cmd) } } }
