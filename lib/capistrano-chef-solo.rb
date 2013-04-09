@@ -32,6 +32,7 @@ module Capistrano
         }
 
         namespace(:chef_solo) {
+          _cset(:chef_solo_use_bundler, true)
           _cset(:chef_solo_version, "11.4.0")
           _cset(:chef_solo_path) { capture("echo $HOME/chef").strip }
           _cset(:chef_solo_cache_path) { File.join(chef_solo_path, "cache") }
@@ -169,7 +170,7 @@ module Capistrano
           desc("Show chef-solo version.")
           task(:version, :except => { :no_release => true }) {
             connect_with_settings do
-              run("cd #{chef_solo_path.dump} && #{bundle_cmd} exec #{chef_solo_cmd} --version")
+              execute("--version")
             end
           }
 
@@ -188,7 +189,7 @@ module Capistrano
           }
 
           task(:install_ruby, :except => { :no_release => true }) {
-            set(:rbenv_install_bundler, true)
+            set(:rbenv_install_bundler, true) if chef_solo_use_bundler
             find_and_execute_task("rbenv:setup")
           }
 
@@ -200,7 +201,7 @@ module Capistrano
           }
           task(:install_chef, :except => { :no_release => true }) {
             begin
-              version = capture("cd #{chef_solo_path.dump} && #{bundle_cmd} exec #{chef_solo_cmd} --version")
+              version = execute("--version", :via => :capture)
               installed = Regexp.new(Regexp.escape(chef_solo_version)) =~ version
             rescue
               installed = false
@@ -208,11 +209,16 @@ module Capistrano
             unless installed
               dirs = [ chef_solo_path, chef_solo_cache_path, chef_solo_config_path ].uniq
               run("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
-              top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
-              args = fetch(:chef_solo_bundle_options, [])
-              args << "--path=#{File.join(chef_solo_path, "bundle").dump}"
-              args << "--quiet"
-              run("cd #{chef_solo_path.dump} && #{bundle_cmd} install #{args.join(" ")}")
+              if chef_solo_use_bundler
+                top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
+                args = fetch(:chef_solo_bundle_options, [])
+                args << "--path=#{File.join(chef_solo_path, "bundle").dump}"
+                args << "--quiet"
+                run("cd #{chef_solo_path.dump} && #{bundle_cmd} install #{args.join(" ")}")
+              else
+                rbenv.exec("gem install -v #{chef_solo_version.to_s.dump} chef", :path => chef_solo_path)
+                rbenv.rehash
+              end
             end
           }
  
@@ -481,10 +487,19 @@ module Capistrano
             run_list = [ options.delete(:run_list) ].flatten.compact
             logger.debug("invoking chef-solo.")
             args = fetch(:chef_solo_options, [])
-            args << "-c #{chef_solo_config_file.dump}"
-            args << "-j #{chef_solo_attributes_file.dump}"
-            args << "-o #{run_list.join(",").dump}" unless run_list.empty?
-            run("cd #{chef_solo_path.dump} && #{sudo} #{bundle_cmd} exec #{chef_solo_cmd} #{args.join(" ")}", options)
+            args += ["-c", chef_solo_config_file]
+            args += ["-j", chef_solo_attributes_file]
+            args += ["-o", run_list.join(",")] unless run_list.empty?
+            execute(args, options.merge(:via => :sudo))
+          end
+
+          def execute(args, options={})
+            if chef_solo_use_bundler
+              command = "bundle exec #{chef_solo_cmd}"
+            else
+              command = chef_solo_cmd
+            end
+            rbenv.exec("#{command} #{[ args ].flatten.compact.map { |x| x.dump }.join(" ")}", options.merge(:path => chef_solo_path))
           end
         }
       }

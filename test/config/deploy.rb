@@ -25,6 +25,7 @@ require "tempfile"
 
 task(:test_all) {
   find_and_execute_task("test_default")
+  find_and_execute_task("test_without_bundler")
   find_and_execute_task("test_with_local_cookbooks")
   find_and_execute_task("test_with_remote_cookbooks")
   find_and_execute_task("test_with_multiple_cookbooks")
@@ -119,6 +120,7 @@ namespace(:test_default) {
 
   task(:setup) {
     reset_chef_solo!
+    set(:chef_solo_use_bundler, true)
     set(:chef_solo_attributes, {"aaa" => "AAA"})
     set(:chef_solo_role_attributes, {:app => {"bbb" => "BBB"}})
     set(:chef_solo_host_attributes, {"192.168.33.10" => {"ccc" => "CCC"}})
@@ -126,6 +128,12 @@ namespace(:test_default) {
     set(:chef_solo_role_run_list, {:app => %w(recipe[bar])})
     set(:chef_solo_host_run_list, {"192.168.33.10" => %w(recipe[baz])})
     set(:chef_solo_capistrano_attributes_include, [:application, :deploy_to])
+    set(:chef_solo_cookbooks_scm, :none)
+    set(:chef_solo_cookbooks_repository, File.expand_path("..", File.dirname(__FILE__)))
+    set(:chef_solo_cookbooks_subdir, "config/cookbooks")
+    set(:chef_solo_data_bags_scm, :none)
+    set(:chef_solo_data_bags_repository, File.expand_path("..", File.dirname(__FILE__)))
+    set(:chef_solo_data_bags_subdir, "config/data_bags")
   }
 
   task(:teardown) {
@@ -146,6 +154,53 @@ namespace(:test_default) {
   }
 }
 
+namespace(:test_without_bundler) {
+  task(:default) {
+    methods.grep(/^test_/).each do |m|
+      send(m)
+    end
+  }
+  before "test_without_bundler", "test_without_bundler:setup"
+  after "test_without_bundler", "test_without_bundler:teardown"
+
+  task(:setup) {
+    reset_chef_solo!
+    set(:chef_solo_use_bundler, false)
+    set(:chef_solo_run_list, %w(recipe[foo] recipe[bar]))
+    set(:chef_solo_cookbooks_scm, :none)
+    set(:chef_solo_cookbooks_repository, File.expand_path("..", File.dirname(__FILE__)))
+    set(:chef_solo_cookbooks_subdir, "config/cookbooks")
+    set(:chef_solo_data_bags_scm, :none)
+    set(:chef_solo_data_bags_repository, File.expand_path("..", File.dirname(__FILE__)))
+    set(:chef_solo_data_bags_subdir, "config/data_bags")
+  }
+
+  task(:teardown) {
+  }
+
+  task(:test_setup) {
+    find_and_execute_task("chef-solo:setup")
+  }
+
+  task(:test_version) {
+    find_and_execute_task("chef-solo:version")
+  }
+
+  task(:test_invoke) {
+    expected = chef_solo_run_list
+    find_and_execute_task("chef-solo")
+    assert_run_list(expected)
+    _test_recipes(expected)
+  }
+
+  task(:test_run_list) {
+    expected = %w(recipe[baz])
+    chef_solo.run_list expected
+#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
+    _test_recipes(expected)
+  }
+}
+
 namespace(:test_with_local_cookbooks) {
   task(:default) {
     methods.grep(/^test_/).each do |m|
@@ -157,6 +212,7 @@ namespace(:test_with_local_cookbooks) {
 
   task(:setup) {
     reset_chef_solo!
+    set(:chef_solo_use_bundler, true)
     set(:chef_solo_run_list, %w(recipe[foo] recipe[bar]))
     set(:chef_solo_cookbooks_scm, :none)
     set(:chef_solo_cookbooks_repository, File.expand_path("..", File.dirname(__FILE__)))
@@ -195,6 +251,7 @@ namespace(:test_with_remote_cookbooks) {
 
   task(:setup) {
     reset_chef_solo!
+    set(:chef_solo_use_bundler, true)
     set(:chef_solo_run_list, %w(recipe[one] recipe[two]))
     set(:chef_solo_cookbooks_scm, :git)
     set(:chef_solo_cookbooks_repository, "git://github.com/yyuu/capistrano-chef-solo.git")
@@ -235,6 +292,7 @@ namespace(:test_with_multiple_cookbooks) {
 
   task(:setup) {
     reset_chef_solo!
+    set(:chef_solo_use_bundler, true)
     set(:chef_solo_run_list, %w(recipe[bar] recipe[baz] recipe[two] recipe[three]))
     set(:chef_solo_cookbooks) {{
       "local" => {
@@ -304,6 +362,7 @@ namespace(:test_with_bootstrap) {
   after "test_with_bootstrap", "test_with_bootstrap:teardown"
 
   task(:setup) {
+    set(:chef_solo_use_bundler, true)
     set(:chef_solo_bootstrap, true)
     set(:chef_solo_bootstrap_user, "bootstrap")
     set(:chef_solo_bootstrap_password, "bootstrap")
@@ -351,6 +410,7 @@ namespace(:test_without_bootstrap) {
   after "test_without_bootstrap", "test_without_bootstrap:teardown"
 
   task(:setup) {
+    set(:chef_solo_use_bundler, true)
     set(:chef_solo_bootstrap, false)
     set(:chef_solo_bootstrap_user, "bootstrap")
     set(:chef_solo_bootstrap_password, "bootstrap")
