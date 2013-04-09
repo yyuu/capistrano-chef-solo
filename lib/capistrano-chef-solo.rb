@@ -193,11 +193,20 @@ module Capistrano
             find_and_execute_task("rbenv:setup")
           }
 
+          _cset(:chef_solo_gem_dependencies) {{
+            fetch(:chef_solo_gem, "chef") => chef_solo_version,
+          }}
           _cset(:chef_solo_gemfile) {
-            (<<-EOS).gsub(/^\s*/, "")
-              source "https://rubygems.org"
-              gem "chef", #{chef_solo_version.to_s.dump}
-            EOS
+            gemfile = []
+            gemfile << %{source "https://rubygems.org"}
+            chef_solo_gem_dependencies.each do |name, options|
+              if options.nil?
+                gemfile << %{gem #{name.dump}}
+              else
+                gemfile << %{gem #{name.dump}, #{options.inspect}}
+              end
+            end
+            gemfile.join("\n")
           }
           task(:install_chef, :except => { :no_release => true }) {
             begin
@@ -216,7 +225,10 @@ module Capistrano
                 args << "--quiet"
                 run("cd #{chef_solo_path.dump} && #{bundle_cmd} install #{args.join(" ")}")
               else
-                rbenv.exec("gem install -v #{chef_solo_version.to_s.dump} chef", :path => chef_solo_path)
+                chef_solo_gem_dependencies.each do |name, options|
+                  args = String === options ? "-v #{options.dump}" : "" # options must be a version string
+                  rbenv.exec("gem install #{args} #{name.dump}", :path => chef_solo_path)
+                end
                 rbenv.rehash
               end
             end
