@@ -179,7 +179,7 @@ namespace(:test_with_local_cookbooks) {
   task(:test_run_list) {
     expected = %w(recipe[baz])
     chef_solo.run_list expected
-    assert_run_list(expected)
+#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
     _test_recipes(expected)
   }
 }
@@ -219,7 +219,7 @@ namespace(:test_with_remote_cookbooks) {
   task(:test_run_list) {
     expected = %w(recipe[three])
     chef_solo.run_list expected
-    assert_run_list(expected)
+#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
     _test_recipes(expected)
   }
 }
@@ -289,7 +289,7 @@ namespace(:test_with_multiple_cookbooks) {
   task(:test_run_list) {
     expected = %w(recipe[foo] recipe[single] recipe[one])
     chef_solo.run_list expected
-    assert_run_list(expected)
+#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
     _test_recipes(expected)
   }
 }
