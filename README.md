@@ -38,7 +38,7 @@ set(:rbenv_ruby_version, "1.9.3-p392")
 Then, create directories for your cookbooks and data bags. By default, `capistrano-chef-solo` searches them from `./config`.
 (see examples of [cookbooks](#using-cookbooks) and [data bags](#using-data-bags) for details)
 
-    $ mkdir -p config/cookbooks config/data_bags
+    $ mkdir -p config/cookbooks config/data_bags config/roles
 
 Now you can start using `chef-solo` via Capistrano.
 

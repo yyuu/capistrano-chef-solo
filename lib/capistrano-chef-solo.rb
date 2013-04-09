@@ -38,6 +38,7 @@ module Capistrano
           _cset(:chef_solo_config_path) { File.join(chef_solo_path, "config") }
           _cset(:chef_solo_cookbooks_path) { File.join(chef_solo_path, "cookbooks") }
           _cset(:chef_solo_data_bags_path) { File.join(chef_solo_path, "data_bags") }
+          _cset(:chef_solo_roles_path) { File.join(chef_solo_path, "roles") }
           _cset(:chef_solo_config_file) { File.join(chef_solo_config_path, "solo.rb") }
           _cset(:chef_solo_attributes_file) { File.join(chef_solo_config_path, "solo.json") }
 
@@ -219,6 +220,7 @@ module Capistrano
           def update(options={})
             update_cookbooks(options)
             update_data_bags(options)
+            update_roles(options)
             update_attributes(options)
             update_config(options)
           end
@@ -234,6 +236,13 @@ module Capistrano
             repos = _normalize_data_bags(chef_solo_data_bags)
             _install_repos(:data_bags, repos, chef_solo_data_bags_path, options) do |name, tmpdir, variables|
               deploy_data_bags(name, tmpdir, variables, options)
+            end
+          end
+
+          def update_roles(options={})
+            repos = _normalize_roles(chef_solo_roles)
+            _install_repos(:roles, repos, chef_solo_roles_path, options) do |name, tmpdir, variables|
+              deploy_roles(name, tmpdir, variables, options)
             end
           end
 
@@ -295,6 +304,21 @@ module Capistrano
             }
           end
 
+          #
+          # The definition of roles.
+          # By default, load roles from local path of "config/roles".
+          #
+          _cset(:chef_solo_roles_exclude) { chef_solo_repository_exclude }
+          _cset(:chef_solo_roles_variables) { chef_solo_repository_variables.merge(:copy_exclude => chef_solo_roles_exclude) }
+          _cset(:chef_solo_roles) { _default_repos(:role, chef_solo_roles_variables) }
+          _cset(:chef_solo_roles_cache) { File.join(chef_solo_repository_cache, "roles-cache") }
+          def _normalize_roles(repos)
+            _normalize_repos(repos, chef_solo_roles_cache, chef_solo_roles_variables) { |name, variables|
+              variables[:deploy_subdir] ||= variables[:roles] # use :roles as :deploy_subdir for backward compatibility with prior than 0.1.2
+              variables[:copy_exclude] ||= variables[:roles_exclude]
+            }
+          end
+
           def _default_repos(singular, variables={}, &block)
             plural = "#{singular}s"
             variables = variables.dup
@@ -334,6 +358,12 @@ module Capistrano
             # deploy as single data_bag, or deploy as multiple data_bags
             final_destination = variables.key?(:data_bag_name) ? File.join(destination, variables[:data_bag_name]) : destination
             _deploy_repo(:data_bags, name, final_destination, variables, options)
+          end
+
+          def deploy_roles(name, destination, variables={}, options={})
+            # deploy as single role, or deploy as multiple roles
+            final_destination = variables.key?(:role_name) ? File.join(destination, variables[:role_name]) : destination
+            _deploy_repo(:roles, name, final_destination, variables, options)
           end
 
           def _deploy_repo(t, name, destination, variables={}, options={})
@@ -382,6 +412,7 @@ module Capistrano
               file_cache_path #{chef_solo_cache_path.dump}
               cookbook_path #{chef_solo_cookbooks_path.dump}
               data_bag_path #{chef_solo_data_bags_path.dump}
+              role_path #{chef_solo_roles_path.dump}
             EOS
           }
           def update_config(options={})
