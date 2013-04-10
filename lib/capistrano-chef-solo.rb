@@ -80,10 +80,10 @@ module Capistrano
               set(:_chef_solo_bootstrap_ssh_options, fetch(:ssh_options))
               # we have to establish connections before teardown.
               # https://github.com/capistrano/capistrano/pull/416
-              establish_connections_to(servers)
+              establish_connections_to(servers) rescue nil
               logger.info("entering chef-solo bootstrap mode. reconnect to servers as `#{chef_solo_bootstrap_user}'.")
               # drop connection which is connected as standard :user.
-              teardown_connections_to(servers)
+              teardown_connections_to(servers) rescue nil
               set(:user, chef_solo_bootstrap_user)
               set(:password, chef_solo_bootstrap_password) if chef_solo_use_password
               set(:ssh_options, chef_solo_bootstrap_ssh_options)
@@ -100,10 +100,10 @@ module Capistrano
               set(:_chef_solo_bootstrapped, false)
               # we have to establish connections before teardown.
               # https://github.com/capistrano/capistrano/pull/416
-              establish_connections_to(servers)
+              establish_connections_to(servers) rescue nil
               logger.info("leaving chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
               # drop connection which is connected as bootstrap :user.
-              teardown_connections_to(servers)
+              teardown_connections_to(servers) rescue nil
               true
             else
               false
