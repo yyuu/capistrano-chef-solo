@@ -132,7 +132,11 @@ module Capistrano
           # initialized without bootstrap settings during `on :load`.
           # Is there any way to avoid this without setting `:rbenv_setup_default_environment`
           # as false?
-          set(:rbenv_setup_default_environment, false)
+          on(:load) do
+            before("rbenv:setup_default_environment") do
+              set(:rbenv_setup_default_environment, false) if chef_solo_bootstrap
+            end
+          end
 
           desc("Setup chef-solo.")
           task(:setup, :except => { :no_release => true }) {
