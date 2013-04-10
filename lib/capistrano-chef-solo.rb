@@ -15,6 +15,11 @@ module Capistrano
             find_and_execute_task("chef_solo:setup")
           }
 
+          desc("Uninstall chef-solo. (an alias of chef_solo:purge)")
+          task(:purge, :except => { :no_release => true }) {
+            find_and_execute_task("chef_solo:purge")
+          }
+
           desc("Run chef-solo. (an alias of chef_solo)")
           task(:default, :except => { :no_release => true }) {
             find_and_execute_task("chef_solo:default")
@@ -32,6 +37,7 @@ module Capistrano
         }
 
         namespace(:chef_solo) {
+          _cset(:chef_solo_use_bundler, true)
           _cset(:chef_solo_version, "11.4.0")
           _cset(:chef_solo_path) { capture("echo $HOME/chef").strip }
           _cset(:chef_solo_cache_path) { File.join(chef_solo_path, "cache") }
@@ -131,13 +137,26 @@ module Capistrano
           # initialized without bootstrap settings during `on :load`.
           # Is there any way to avoid this without setting `:rbenv_setup_default_environment`
           # as false?
-          set(:rbenv_setup_default_environment, false)
+          on(:load) do
+            before("rbenv:setup_default_environment") do
+              set(:rbenv_setup_default_environment, false) if chef_solo_bootstrap
+            end
+          end
 
           desc("Setup chef-solo.")
           task(:setup, :except => { :no_release => true }) {
             connect_with_settings do
               transaction do
                 install
+              end
+            end
+          }
+
+          desc("Uninstall chef-solo.")
+          task(:purge, :except => { :no_release => true }) {
+            connect_with_settings do
+              transaction do
+                uninstall
               end
             end
           }
@@ -158,8 +177,8 @@ module Capistrano
             connect_with_settings do
               setup
               transaction do
-                update(:run_list => recipes)
-                invoke
+                update
+                invoke(:run_list => recipes)
               end
             end
           end
@@ -169,7 +188,7 @@ module Capistrano
           desc("Show chef-solo version.")
           task(:version, :except => { :no_release => true }) {
             connect_with_settings do
-              run("cd #{chef_solo_path.dump} && #{bundle_cmd} exec #{chef_solo_cmd} --version")
+              execute("--version")
             end
           }
 
@@ -182,25 +201,26 @@ module Capistrano
             STDOUT.puts(_json_attributes(attributes))
           }
 
-          task(:install, :except => { :no_release => true }) {
-            install_ruby
-            install_chef
-          }
-
-          task(:install_ruby, :except => { :no_release => true }) {
-            set(:rbenv_install_bundler, true)
-            find_and_execute_task("rbenv:setup")
-          }
-
+          _cset(:chef_solo_gem_dependencies) {{
+            fetch(:chef_solo_gem, "chef") => chef_solo_version,
+          }}
           _cset(:chef_solo_gemfile) {
-            (<<-EOS).gsub(/^\s*/, "")
-              source "https://rubygems.org"
-              gem "chef", #{chef_solo_version.to_s.dump}
-            EOS
+            gemfile = []
+            gemfile << %{source "https://rubygems.org"}
+            chef_solo_gem_dependencies.each do |name, options|
+              if options.nil?
+                gemfile << %{gem #{name.dump}}
+              else
+                gemfile << %{gem #{name.dump}, #{options.inspect}}
+              end
+            end
+            gemfile.join("\n")
           }
-          task(:install_chef, :except => { :no_release => true }) {
+          task(:install, :except => { :no_release => true }) {
+            set(:rbenv_install_bundler, true) if chef_solo_use_bundler
+            find_and_execute_task("rbenv:setup")
             begin
-              version = capture("cd #{chef_solo_path.dump} && #{bundle_cmd} exec #{chef_solo_cmd} --version")
+              version = execute("--version", :via => :capture)
               installed = Regexp.new(Regexp.escape(chef_solo_version)) =~ version
             rescue
               installed = false
@@ -208,14 +228,34 @@ module Capistrano
             unless installed
               dirs = [ chef_solo_path, chef_solo_cache_path, chef_solo_config_path ].uniq
               run("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
-              top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
-              args = fetch(:chef_solo_bundle_options, [])
-              args << "--path=#{File.join(chef_solo_path, "bundle").dump}"
-              args << "--quiet"
-              run("cd #{chef_solo_path.dump} && #{bundle_cmd} install #{args.join(" ")}")
+              if chef_solo_use_bundler
+                top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
+                args = fetch(:chef_solo_bundle_options, [])
+                args << "--path=#{File.join(chef_solo_path, "bundle").dump}"
+                args << "--quiet"
+                run("cd #{chef_solo_path.dump} && #{bundle_cmd} install #{args.join(" ")}")
+              else
+                chef_solo_gem_dependencies.each do |name, options|
+                  args = String === options ? "-v #{options.dump}" : "" # options must be a version string
+                  rbenv.exec("gem install #{args} #{name.dump}", :path => chef_solo_path)
+                end
+                rbenv.rehash
+              end
             end
           }
  
+          task(:uninstall, :except => { :no_release => true }) {
+            if chef_solo_use_bundler
+              run("rm -f #{File.join(chef_solo_path, "Gemfile").dump} #{File.join(chef_solo_path, "Gemfile.lock").dump}")
+              run("rm -rf #{File.join(chef_solo_path, "bundle").dump}")
+            else
+              chef_solo_gem_dependencies.each do |name, options|
+                args = String === options ? "-v #{options.dump}" : "" # options must be a version string
+                rbenv.exec("gem uninstall -I -x #{args} #{name.dump}", :path => chef_solo_path)
+              end
+            end
+          }
+
           def update(options={})
             update_cookbooks(options)
             update_data_bags(options)
@@ -345,7 +385,7 @@ module Capistrano
               c.instance_eval do
                 set(:deploy_to, File.dirname(releases_path))
                 set(:releases_path, releases_path)
-                set(:release_path, File.join(releases_path, release_name))
+                set(:release_path, release_path)
                 set(:revision) { source.head }
                 set(:source) { ::Capistrano::Deploy::SCM.new(scm, self) }
                 set(:real_revision) { source.local.query_revision(revision) { |cmd| with_env("LC_ALL", "C") { run_locally(cmd) } } }
@@ -437,7 +477,6 @@ module Capistrano
           def _generate_attributes(options={})
             hosts = [ options.delete(:hosts) ].flatten.compact.uniq
             roles = [ options.delete(:roles) ].flatten.compact.uniq
-            run_list = [ options.delete(:run_list) ].flatten.compact.uniq
             #
             # By default, the Chef attributes will be generated by following order.
             # 
@@ -455,43 +494,46 @@ module Capistrano
               _merge_attributes!(attributes, chef_solo_host_attributes.fetch(host, {}))
             end
             #
-            # The Chef `run_list` will be generated by following rules.
+            # The Chef `run_list` will be generated from `:chef_solo_role_run_list` and
+            # `:chef_solo_host_run_list`.
             #
-            # * If `:run_list` was given as argument, just use it.
-            # * Otherwise, generate it from `:chef_solo_role_run_list`, `:chef_solo_role_run_list`
-            #   and `:chef_solo_host_run_list`.
-            #
-            if run_list.empty?
-              _merge_attributes!(attributes, {"run_list" => chef_solo_run_list})
-              roles.each do |role|
-                _merge_attributes!(attributes, {"run_list" => chef_solo_role_run_list.fetch(role, [])})
-              end
-              hosts.each do |host|
-                _merge_attributes!(attributes, {"run_list" => chef_solo_host_run_list.fetch(host, [])})
-              end
-            else
-              attributes["run_list"] = [] # ignore run_list not from argument
-              _merge_attributes!(attributes, {"run_list" => run_list})
+            _merge_attributes!(attributes, {"run_list" => chef_solo_run_list})
+            roles.each do |role|
+              _merge_attributes!(attributes, {"run_list" => chef_solo_role_run_list.fetch(role, [])})
+            end
+            hosts.each do |host|
+              _merge_attributes!(attributes, {"run_list" => chef_solo_host_run_list.fetch(host, [])})
             end
             attributes
           end
 
           def update_attributes(options={})
-            run_list = options.delete(:run_list)
             servers = find_servers_for_task(current_task)
             servers.each do |server|
               logger.debug("updating chef-solo attributes for #{server.host}.")
-              attributes = _generate_attributes(:hosts => server.host, :roles => role_names_for_host(server), :run_list => run_list)
+              attributes = _generate_attributes(:hosts => server.host, :roles => role_names_for_host(server))
               top.put(_json_attributes(attributes), chef_solo_attributes_file, options.merge(:hosts => server.host))
             end
           end
 
           def invoke(options={})
+            options = options.dup
+            run_list = [ options.delete(:run_list) ].flatten.compact
             logger.debug("invoking chef-solo.")
             args = fetch(:chef_solo_options, [])
-            args << "-c #{chef_solo_config_file.dump}"
-            args << "-j #{chef_solo_attributes_file.dump}"
-            run("cd #{chef_solo_path.dump} && #{sudo} #{bundle_cmd} exec #{chef_solo_cmd} #{args.join(" ")}", options)
+            args += ["-c", chef_solo_config_file]
+            args += ["-j", chef_solo_attributes_file]
+            args += ["-o", run_list.join(",")] unless run_list.empty?
+            execute(args, options.merge(:via => :sudo))
+          end
+
+          def execute(args, options={})
+            if chef_solo_use_bundler
+              command = "bundle exec #{chef_solo_cmd}"
+            else
+              command = chef_solo_cmd
+            end
+            rbenv.exec("#{command} #{[ args ].flatten.compact.map { |x| x.dump }.join(" ")}", options.merge(:path => chef_solo_path))
           end
         }
       }

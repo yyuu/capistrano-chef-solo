@@ -230,17 +230,19 @@ You can check generated attributes with using `chef-solo:attributes` task.
 
 Following options are available to manage your `chef-solo`.
 
- * `:chef_solo_version` - the version of chef.
- * `:chef_solo_cookbooks` - the definition of cookbooks. by default, copy cookbooks from `./config/cookbooks`.
- * `:chef_solo_attributes` - the `attributes` of chef-solo. must be a `Hash<String,String>`. will be converted into JSON.
- * `:chef_solo_run_list` - the `run_list` of chef-solo. must be an `Array<String>`. will be merged into `:chef_solo_attributes`.
- * `:chef_solo_role_attributes` - the per-roles `attributes` of chef-solo. must be a `Hash<Symbol,Hash<String,String>>`.
- * `:chef_solo_role_run_list` - the per-roles `run_list` of chef-solo. must be a `Hash<Symbol,Array<String>>`.
- * `:chef_solo_host_attributes` - the per-hosts `attributes` of chef-solo. must be a `Hash<String,Hash<String,String>>`.
- * `:chef_solo_host_run_list` - the per-hosts `run_list` of chef-solo. must be a `Hash<String,Array<String>>`.
- * `:chef_solo_capistrano_attributes` - the Capistrano variables to use as Chef attributes.
- * `:chef_solo_capistrano_attributes_exclude` - the black list for `:chef_solo_capistrano_attributes`
- * `:chef_solo_capistrano_attributes_include` - the white list for `:chef_solo_capistrano_attributes`
+ * `:chef_solo_version` - The version of Chef.
+ * `:chef_solo_use_bunler` - Use bundler to install Chef. Set `true` by default.
+ * `:chef_solo_cookbooks` - The definition of cookbooks. By default, use cookbooks in `./config/cookbooks`.
+ * `:chef_solo_data_bags` - The definition of data bags. By default, use data bags in `./config/data_bags`.
+ * `:chef_solo_attributes` - The `attributes` of chef-solo. must be a `Hash<String,String>`. This will be converted into JSON.
+ * `:chef_solo_run_list` - The `run_list` of chef-solo. must be an `Array<String>`. This will be merged into `:chef_solo_attributes`.
+ * `:chef_solo_role_attributes` - The per-roles `attributes` of chef-solo. This must be a `Hash<Symbol,Hash<String,String>>`.
+ * `:chef_solo_role_run_list` - The per-roles `run_list` of chef-solo. This must be a `Hash<Symbol,Array<String>>`.
+ * `:chef_solo_host_attributes` - The per-hosts `attributes` of chef-solo. This must be a `Hash<String,Hash<String,String>>`.
+ * `:chef_solo_host_run_list` - The per-hosts `run_list` of chef-solo. This must be a `Hash<String,Array<String>>`.
+ * `:chef_solo_capistrano_attributes` - The Capistrano variables to use as Chef attributes.
+ * `:chef_solo_capistrano_attributes_exclude` - The black list for `:chef_solo_capistrano_attributes`
+ * `:chef_solo_capistrano_attributes_include` - The white list for `:chef_solo_capistrano_attributes`
 
 
 ## Contributing
