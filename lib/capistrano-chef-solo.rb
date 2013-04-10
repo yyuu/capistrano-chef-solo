@@ -15,6 +15,11 @@ module Capistrano
             find_and_execute_task("chef_solo:setup")
           }
 
+          desc("Uninstall chef-solo. (an alias of chef_solo:purge)")
+          task(:purge, :except => { :no_release => true }) {
+            find_and_execute_task("chef_solo:purge")
+          }
+
           desc("Run chef-solo. (an alias of chef_solo)")
           task(:default, :except => { :no_release => true }) {
             find_and_execute_task("chef_solo:default")
@@ -147,6 +152,15 @@ module Capistrano
             end
           }
 
+          desc("Uninstall chef-solo.")
+          task(:purge, :except => { :no_release => true }) {
+            connect_with_settings do
+              transaction do
+                uninstall
+              end
+            end
+          }
+
           desc("Run chef-solo.")
           task(:default, :except => { :no_release => true }) {
             connect_with_settings do
@@ -187,16 +201,6 @@ module Capistrano
             STDOUT.puts(_json_attributes(attributes))
           }
 
-          task(:install, :except => { :no_release => true }) {
-            install_ruby
-            install_chef
-          }
-
-          task(:install_ruby, :except => { :no_release => true }) {
-            set(:rbenv_install_bundler, true) if chef_solo_use_bundler
-            find_and_execute_task("rbenv:setup")
-          }
-
           _cset(:chef_solo_gem_dependencies) {{
             fetch(:chef_solo_gem, "chef") => chef_solo_version,
           }}
@@ -212,7 +216,9 @@ module Capistrano
             end
             gemfile.join("\n")
           }
-          task(:install_chef, :except => { :no_release => true }) {
+          task(:install, :except => { :no_release => true }) {
+            set(:rbenv_install_bundler, true) if chef_solo_use_bundler
+            find_and_execute_task("rbenv:setup")
             begin
               version = execute("--version", :via => :capture)
               installed = Regexp.new(Regexp.escape(chef_solo_version)) =~ version
@@ -238,6 +244,18 @@ module Capistrano
             end
           }
  
+          task(:uninstall, :except => { :no_release => true }) {
+            if chef_solo_use_bundler
+              run("rm -f #{File.join(chef_solo_path, "Gemfile").dump} #{File.join(chef_solo_path, "Gemfile.lock").dump}")
+              run("rm -rf #{File.join(chef_solo_path, "bundle").dump}")
+            else
+              chef_solo_gem_dependencies.each do |name, options|
+                args = String === options ? "-v #{options.dump}" : "" # options must be a version string
+                rbenv.exec("gem uninstall -I -x #{args} #{name.dump}", :path => chef_solo_path)
+              end
+            end
+          }
+
           def update(options={})
             update_cookbooks(options)
             update_data_bags(options)
