@@ -456,8 +456,8 @@ module Capistrano
             #    (lazy variables might have any side-effects)
             #
             attributes = variables.reject { |key, value|
-              excluded = chef_solo_capistrano_attributes_exclude.include?(key)
-              included = chef_solo_capistrano_attributes_include.include?(key)
+              excluded = chef_solo_capistrano_attributes_exclude.find { |x| x === key }
+              included = chef_solo_capistrano_attributes_include.find { |x| x === key }
               excluded or (not included and value.respond_to?(:call))
             }
             Hash[attributes.map { |key, value| [key, fetch(key, nil)] }]
@@ -466,7 +466,7 @@ module Capistrano
             :application, :deploy_to, :rails_env, :latest_release,
             :releases_path, :shared_path, :current_path, :release_path,
           ])
-          _cset(:chef_solo_capistrano_attributes_exclude, [:logger, :password])
+          _cset(:chef_solo_capistrano_attributes_exclude, [:logger, /password/, :source, :strategy])
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_host_attributes, {})
           _cset(:chef_solo_role_attributes, {})
