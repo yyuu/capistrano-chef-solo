@@ -1,6 +1,7 @@
 require "capistrano-chef-solo/version"
 require "capistrano-rbenv"
 require "capistrano/configuration"
+require "capistrano/errors"
 require "capistrano/recipes/deploy/scm"
 require "json"
 require "uri"
@@ -118,7 +119,7 @@ module Capistrano
                 begin
                   activated = _activate_settings(servers)
                   yield
-                rescue => error
+                rescue Capistrano::ConnectionError => error
                   logger.info("could not connect with bootstrap settings: #{error}")
                   raise
                 ensure
