@@ -1,6 +1,7 @@
 require "capistrano-chef-solo/version"
 require "capistrano-rbenv"
 require "capistrano/configuration"
+require "capistrano/errors"
 require "capistrano/recipes/deploy/scm"
 require "json"
 require "uri"
@@ -80,10 +81,10 @@ module Capistrano
               set(:_chef_solo_bootstrap_ssh_options, fetch(:ssh_options))
               # we have to establish connections before teardown.
               # https://github.com/capistrano/capistrano/pull/416
-              establish_connections_to(servers)
+              establish_connections_to(servers) rescue nil
               logger.info("entering chef-solo bootstrap mode. reconnect to servers as `#{chef_solo_bootstrap_user}'.")
               # drop connection which is connected as standard :user.
-              teardown_connections_to(servers)
+              teardown_connections_to(servers) rescue nil
               set(:user, chef_solo_bootstrap_user)
               set(:password, chef_solo_bootstrap_password) if chef_solo_use_password
               set(:ssh_options, chef_solo_bootstrap_ssh_options)
@@ -100,10 +101,10 @@ module Capistrano
               set(:_chef_solo_bootstrapped, false)
               # we have to establish connections before teardown.
               # https://github.com/capistrano/capistrano/pull/416
-              establish_connections_to(servers)
+              establish_connections_to(servers) rescue nil
               logger.info("leaving chef-solo bootstrap mode. reconnect to servers as `#{user}'.")
               # drop connection which is connected as bootstrap :user.
-              teardown_connections_to(servers)
+              teardown_connections_to(servers) rescue nil
               true
             else
               false
@@ -118,7 +119,7 @@ module Capistrano
                 begin
                   activated = _activate_settings(servers)
                   yield
-                rescue => error
+                rescue Capistrano::ConnectionError => error
                   logger.info("could not connect with bootstrap settings: #{error}")
                   raise
                 ensure
@@ -456,8 +457,8 @@ module Capistrano
             #    (lazy variables might have any side-effects)
             #
             attributes = variables.reject { |key, value|
-              excluded = chef_solo_capistrano_attributes_exclude.include?(key)
-              included = chef_solo_capistrano_attributes_include.include?(key)
+              excluded = chef_solo_capistrano_attributes_exclude.find { |x| x === key }
+              included = chef_solo_capistrano_attributes_include.find { |x| x === key }
               excluded or (not included and value.respond_to?(:call))
             }
             Hash[attributes.map { |key, value| [key, fetch(key, nil)] }]
@@ -466,7 +467,7 @@ module Capistrano
             :application, :deploy_to, :rails_env, :latest_release,
             :releases_path, :shared_path, :current_path, :release_path,
           ])
-          _cset(:chef_solo_capistrano_attributes_exclude, [:logger, :password])
+          _cset(:chef_solo_capistrano_attributes_exclude, [:logger, /password/, :source, :strategy])
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_host_attributes, {})
           _cset(:chef_solo_role_attributes, {})
