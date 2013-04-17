@@ -30,3 +30,7 @@ v0.1.5 (Yamashita, Yuu)
 * Catch exceptions on initial handshake during bootstrap mode.
 * Improve error logging during bootstrap mode.
 * Support regex match for `:chef_solo_capistrano_attributes_exclude` and `:chef_solo_capistrano_attributes_include`.
+
+v0.1.6 (Yamashita, Yuu)
+
+* Support options Hash in `chef_solo.run_list()`. Now it skips updating cookbooks, data bags, attirbutes and configurations if `:update => false` was given.
