@@ -181,6 +181,9 @@ set(:chef_solo_run_list, ["recipe[locales]", "recipe[tzdata]"])
 
 In some cases, you may want to apply individual `attributes` per roles.
 
+Following example will create Chef roles `role[app]` and `role[web]`.
+All attributes defined in `:chef_solo_role_attributes` will be merged into `default_attributes` of Chef role.
+
 ```ruby
 set(:chef_solo_role_attributes) {
   :app => {
