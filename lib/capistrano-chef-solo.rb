@@ -175,11 +175,13 @@ module Capistrano
 
           # Acts like `default`, but will apply specified recipes only.
           def run_list(*recipes)
+            options = { :update => true }.merge(Hash === recipes.last ? recipes.pop : {})
+            update_p = options.delete(:update)
             connect_with_settings do
               setup
               transaction do
-                update
-                invoke(:run_list => recipes)
+                update(options) if update_p
+                invoke(options.merge(:run_list => recipes))
               end
             end
           end
