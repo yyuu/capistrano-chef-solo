@@ -34,3 +34,4 @@ v0.1.5 (Yamashita, Yuu)
 v0.1.6 (Yamashita, Yuu)
 
 * Support options Hash in `chef_solo.run_list()`. Now it skips updating cookbooks, data bags, attirbutes and configurations if `:update => false` was given.
+* Generate Chef roles from Capistrano roles and apply them by default.
