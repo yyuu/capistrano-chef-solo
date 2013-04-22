@@ -35,6 +35,16 @@ module Capistrano
           task(:attributes, :except => { :no_release => true }) {
             find_and_execute_task("chef_solo:attributes")
           }
+
+          desc("Show chef-solo attributes for role. (an alias of chef_solo:role_attributes)")
+          task(:role_attributes, :except => { :no_release => true }) {
+            find_and_execute_task("chef_solo:role_attributes")
+          }
+
+          desc("Show chef-solo attributes for host. (an alias of chef_solo:host_attributes)")
+          task(:host_attributes, :except => { :no_release => true }) {
+            find_and_execute_task("chef_solo:host_attributes")
+          }
         }
 
         namespace(:chef_solo) {
@@ -198,11 +208,34 @@ module Capistrano
 
           desc("Show chef-solo attributes.")
           task(:attributes, :except => { :no_release => true }) {
-            hosts = ENV.fetch("HOST", "").split(/\s*,\s*/)
-            roles = ENV.fetch("ROLE", "").split(/\s*,\s*/).map { |role| role.to_sym }
-            roles += hosts.map { |host| role_names_for_host(ServerDefinition.new(host)) }
-            attributes = _generate_attributes(:hosts => hosts, :roles => roles)
-            STDOUT.puts(_json_attributes(attributes))
+            find_and_execute_task("chef_solo:host_attributes")
+            find_and_execute_task("chef_solo:role_attributes")
+          }
+
+          desc("Show chef-solo attributes for host.")
+          task(:host_attributes, :except => { :no_release => true }) {
+            if ENV.key?("HOST")
+              hosts = ENV.fetch("HOST", "").split(/\s*,\s*/)
+            else
+              hosts = find_servers_for_task(current_task).map { |server| server.host }
+            end
+            hosts.each do |host|
+              logger.debug("generating chef-solo attributes for host `#{host}'.")
+              STDOUT.puts(_json_attributes(_generate_host_attributes(host, :roles => role_names_for_host(ServerDefinition.new(host)))))
+            end
+          }
+
+          desc("Show chef-solo attributes for role.")
+          task(:role_attributes, :except => { :no_release => true }) {
+            if ENV.key?("ROLE")
+              roles = ENV.fetch("ROLE", "").split(/\s*,\s*/).map { |role| role.to_sym }
+            else
+              roles = find_servers_for_task(current_task).map { |server| role_names_for_host(server) }.flatten.uniq
+            end
+            roles.each do |role|
+              logger.debug("generating chef-solo attributes for role `#{role}'.")
+              STDOUT.puts(_json_attributes(_generate_role_attributes(role)))
+            end
           }
 
           _cset(:chef_solo_gem_dependencies) {{
@@ -474,19 +507,6 @@ module Capistrano
           _cset(:chef_solo_capistrano_attributes_exclude, [:logger, /password/, :source, :strategy])
           _cset(:chef_solo_attributes, {})
           _cset(:chef_solo_run_list, [])
-          def _generate_attributes(options={})
-            roles = [ options.delete(:roles) ].flatten.compact.uniq
-            hosts = [ options.delete(:hosts) ].flatten.compact.uniq
-            attributes = {}
-            roles.each do |role|
-              _merge_attributes!(attributes, _generate_role_attributes(role))
-            end
-            hosts.each do |host|
-              _merge_attributes!(attributes, _generate_host_attributes(host, :roles => roles))
-            end
-            attributes
-          end
-
           _cset(:chef_solo_host_attributes, {})
           _cset(:chef_solo_host_run_list, {})
           def _generate_host_attributes(host, options={})
