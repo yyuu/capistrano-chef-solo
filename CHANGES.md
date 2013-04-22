@@ -35,3 +35,4 @@ v0.1.6 (Yamashita, Yuu)
 
 * Support options Hash in `chef_solo.run_list()`. Now it skips updating cookbooks, data bags, attirbutes and configurations if `:update => false` was given.
 * Generate Chef roles from Capistrano roles and apply them by default.
+* Add new tasks chef-solo:host_attributes and chef-solo:role_attributes to show effective attributes.
