@@ -35,6 +35,16 @@ module Capistrano
           task(:attributes, :except => { :no_release => true }) {
             find_and_execute_task("chef_solo:attributes")
           }
+
+          desc("Show chef-solo attributes for role. (an alias of chef_solo:role_attributes)")
+          task(:role_attributes, :except => { :no_release => true }) {
+            find_and_execute_task("chef_solo:role_attributes")
+          }
+
+          desc("Show chef-solo attributes for host. (an alias of chef_solo:host_attributes)")
+          task(:host_attributes, :except => { :no_release => true }) {
+            find_and_execute_task("chef_solo:host_attributes")
+          }
         }
 
         namespace(:chef_solo) {
@@ -45,6 +55,7 @@ module Capistrano
           _cset(:chef_solo_config_path) { File.join(chef_solo_path, "config") }
           _cset(:chef_solo_cookbooks_path) { File.join(chef_solo_path, "cookbooks") }
           _cset(:chef_solo_data_bags_path) { File.join(chef_solo_path, "data_bags") }
+          _cset(:chef_solo_roles_path) { File.join(chef_solo_path, "roles") }
           _cset(:chef_solo_config_file) { File.join(chef_solo_config_path, "solo.rb") }
           _cset(:chef_solo_attributes_file) { File.join(chef_solo_config_path, "solo.json") }
 
@@ -175,11 +186,13 @@ module Capistrano
 
           # Acts like `default`, but will apply specified recipes only.
           def run_list(*recipes)
+            options = { :update => true }.merge(Hash === recipes.last ? recipes.pop : {})
+            update_p = options.delete(:update)
             connect_with_settings do
               setup
               transaction do
-                update
-                invoke(:run_list => recipes)
+                update(options) if update_p
+                invoke(options.merge(:run_list => recipes))
               end
             end
           end
@@ -195,11 +208,34 @@ module Capistrano
 
           desc("Show chef-solo attributes.")
           task(:attributes, :except => { :no_release => true }) {
-            hosts = ENV.fetch("HOST", "").split(/\s*,\s*/)
-            roles = ENV.fetch("ROLE", "").split(/\s*,\s*/).map { |role| role.to_sym }
-            roles += hosts.map { |host| role_names_for_host(ServerDefinition.new(host)) }
-            attributes = _generate_attributes(:hosts => hosts, :roles => roles)
-            STDOUT.puts(_json_attributes(attributes))
+            find_and_execute_task("chef_solo:host_attributes")
+            find_and_execute_task("chef_solo:role_attributes")
+          }
+
+          desc("Show chef-solo attributes for host.")
+          task(:host_attributes, :except => { :no_release => true }) {
+            if ENV.key?("HOST")
+              hosts = ENV.fetch("HOST", "").split(/\s*,\s*/)
+            else
+              hosts = find_servers_for_task(current_task).map { |server| server.host }
+            end
+            hosts.each do |host|
+              logger.debug("generating chef-solo attributes for host `#{host}'.")
+              STDOUT.puts(_json_attributes(_generate_host_attributes(host, :roles => role_names_for_host(ServerDefinition.new(host)))))
+            end
+          }
+
+          desc("Show chef-solo attributes for role.")
+          task(:role_attributes, :except => { :no_release => true }) {
+            if ENV.key?("ROLE")
+              roles = ENV.fetch("ROLE", "").split(/\s*,\s*/).map { |role| role.to_sym }
+            else
+              roles = find_servers_for_task(current_task).map { |server| role_names_for_host(server) }.flatten.uniq
+            end
+            roles.each do |role|
+              logger.debug("generating chef-solo attributes for role `#{role}'.")
+              STDOUT.puts(_json_attributes(_generate_role_attributes(role)))
+            end
           }
 
           _cset(:chef_solo_gem_dependencies) {{
@@ -226,9 +262,9 @@ module Capistrano
             rescue
               installed = false
             end
+            dirs = [ chef_solo_path, chef_solo_cache_path, chef_solo_config_path, chef_solo_roles_path ].uniq
+            run("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
             unless installed
-              dirs = [ chef_solo_path, chef_solo_cache_path, chef_solo_config_path ].uniq
-              run("mkdir -p #{dirs.map { |x| x.dump }.join(" ")}")
               if chef_solo_use_bundler
                 top.put(chef_solo_gemfile, File.join(chef_solo_path, "Gemfile"))
                 args = fetch(:chef_solo_bundle_options, [])
@@ -423,6 +459,7 @@ module Capistrano
               file_cache_path #{chef_solo_cache_path.dump}
               cookbook_path #{chef_solo_cookbooks_path.dump}
               data_bag_path #{chef_solo_data_bags_path.dump}
+              role_path #{chef_solo_roles_path.dump}
             EOS
           }
           def update_config(options={})
@@ -469,50 +506,53 @@ module Capistrano
           ])
           _cset(:chef_solo_capistrano_attributes_exclude, [:logger, /password/, :source, :strategy])
           _cset(:chef_solo_attributes, {})
-          _cset(:chef_solo_host_attributes, {})
-          _cset(:chef_solo_role_attributes, {})
           _cset(:chef_solo_run_list, [])
+          _cset(:chef_solo_host_attributes, {})
           _cset(:chef_solo_host_run_list, {})
-          _cset(:chef_solo_role_run_list, {})
-
-          def _generate_attributes(options={})
-            hosts = [ options.delete(:hosts) ].flatten.compact.uniq
+          def _generate_host_attributes(host, options={})
             roles = [ options.delete(:roles) ].flatten.compact.uniq
             #
             # By default, the Chef attributes will be generated by following order.
             # 
             # 1. Use _non-lazy_ variables of Capistrano.
             # 2. Use attributes defined in `:chef_solo_attributes`.
-            # 3. Use attributes defined in `:chef_solo_role_attributes` for target role.
-            # 4. Use attributes defined in `:chef_solo_host_attributes` for target host.
+            # 3. Use attributes defined in `:chef_solo_host_attributes` for target host.
             #
             attributes = chef_solo_capistrano_attributes.dup
             _merge_attributes!(attributes, chef_solo_attributes)
-            roles.each do |role|
-              _merge_attributes!(attributes, chef_solo_role_attributes.fetch(role, {}))
-            end
-            hosts.each do |host|
-              _merge_attributes!(attributes, chef_solo_host_attributes.fetch(host, {}))
-            end
+            _merge_attributes!(attributes, chef_solo_host_attributes.fetch(host, {}))
             #
-            # The Chef `run_list` will be generated from `:chef_solo_role_run_list` and
-            # `:chef_solo_host_run_list`.
+            # The Chef `run_list` will be generated from `:chef_solo_run_list` and `:chef_solo_host_run_list`.
             #
             _merge_attributes!(attributes, {"run_list" => chef_solo_run_list})
-            roles.each do |role|
-              _merge_attributes!(attributes, {"run_list" => chef_solo_role_run_list.fetch(role, [])})
-            end
-            hosts.each do |host|
-              _merge_attributes!(attributes, {"run_list" => chef_solo_host_run_list.fetch(host, [])})
-            end
+            _merge_attributes!(attributes, {"run_list" => roles.map { |role| "role[#{role}]" } }) unless roles.empty?
+            _merge_attributes!(attributes, {"run_list" => chef_solo_host_run_list.fetch(host, [])})
+            attributes
+          end
+
+          _cset(:chef_solo_role_attributes, {})
+          _cset(:chef_solo_role_run_list, {})
+          def _generate_role_attributes(role, options={})
+            attributes = {
+              "name" => role,
+              "chef_type" => "role",
+              "json_class" => "Chef::Role",
+            }
+            _merge_attributes!(attributes, {"default_attributes" => chef_solo_role_attributes.fetch(role, {})})
+            _merge_attributes!(attributes, {"run_list" => chef_solo_role_run_list.fetch(role, [])})
             attributes
           end
 
           def update_attributes(options={})
+            roles.each_key.each do |role|
+              logger.debug("updating chef-solo role attributes for #{role}.")
+              attributes = _generate_role_attributes(role)
+              top.put(_json_attributes(attributes), File.join(chef_solo_roles_path, "#{role}.json"), options)
+            end
             servers = find_servers_for_task(current_task)
             servers.each do |server|
-              logger.debug("updating chef-solo attributes for #{server.host}.")
-              attributes = _generate_attributes(:hosts => server.host, :roles => role_names_for_host(server))
+              logger.debug("updating chef-solo host attributes for #{server.host}.")
+              attributes = _generate_host_attributes(server.host, :roles => role_names_for_host(server))
               top.put(_json_attributes(attributes), chef_solo_attributes_file, options.merge(:hosts => server.host))
             end
           end

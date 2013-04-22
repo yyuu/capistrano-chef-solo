@@ -16,7 +16,7 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
   gem.version       = Capistrano::ChefSolo::VERSION
 
-  gem.add_dependency("capistrano", ">= 2.10.0")
+  gem.add_dependency("capistrano", [">= 2.10.0", "< 3"])
   gem.add_dependency("capistrano-copy-subdir", ">= 0.1.0")
   gem.add_dependency("capistrano-rbenv", ">= 1.0.1")
 end

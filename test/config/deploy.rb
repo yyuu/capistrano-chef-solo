@@ -39,22 +39,52 @@ def get_file(file, options={})
   tempfile.read
 end
 
-def get_attributes(options={})
+def get_host_attributes(options={})
   JSON.load(get_file(chef_solo_attributes_file, options))
 end
 
-def assert_attributes(expected, options={})
-  found = get_attributes(options)
+def get_role_attributes(role, options={})
+  JSON.load(get_file(File.join(chef_solo_roles_path, "#{role}.json"), options))
+end
+
+def test_attribute(x, y)
+  if Array === x
+    x.sort == Array(y).sort
+  else
+    x == y
+  end
+end
+
+def assert_host_attributes(expected, options={})
+  found = get_host_attributes(options)
   expected.each do |key, value|
-    if found[key] != value
-      abort("invalid attribute: #{key.inspect} (expected:#{value.inspect} != found:#{found[key].inspect})")
+    unless test_attribute(found[key], value)
+      abort("invalid host attribute: #{key.inspect} (expected:#{value.inspect} != found:#{found[key].inspect})")
     end
   end
 end
 
-def assert_run_list(expected, options={})
-  found = get_attributes(options)["run_list"]
-  abort("invalid run_list (expected:#{expected.inspect} != found:#{found.inspect})") if found != expected
+def assert_role_attributes(role, expected, options={})
+  found = get_role_attributes(role, options)
+  expected.each do |key, value|
+    unless test_attribute(found[key], value)
+      abort("invalid role attribute: #{key.inspect} (expected:#{value.inspect} != found:#{found[key].inspect})")
+    end
+  end
+end
+
+def assert_host_run_list(expected, options={})
+  found = get_host_attributes(options)["run_list"]
+  unless test_attribute(found, expected)
+    abort("invalid host run_list (expected:#{expected.inspect} != found:#{found.inspect})")
+  end
+end
+
+def assert_role_run_list(role, expected=[], options={})
+  found = [ get_role_attributes(role, options)["run_list"] ].flatten
+  unless test_attribute(found, expected)
+    abort("invalid role run_list (expected:#{expected.inspect} != found:#{found.inspect})")
+  end
 end
 
 def assert_file_exists(file, options={})
@@ -149,8 +179,9 @@ namespace(:test_default) {
 
   task(:test_attributes, :roles => :app) {
     chef_solo.update_attributes
-    assert_attributes({"aaa" => "AAA", "bbb" => "BBB", "ccc" => "CCC", "run_list" => %w(recipe[foo] recipe[bar] recipe[baz])})
-    assert_attributes({"application" => application, "deploy_to" => deploy_to})
+    assert_host_attributes({"aaa" => "AAA", "ccc" => "CCC", "run_list" => %w(recipe[foo] recipe[baz] role[web] role[app] role[db])})
+    assert_role_attributes(:app, {"default_attributes" => {"bbb" => "BBB"}, "run_list" => %w(recipe[bar])})
+    assert_host_attributes({"application" => application, "deploy_to" => deploy_to})
   }
 }
 
@@ -189,14 +220,14 @@ namespace(:test_without_bundler) {
   task(:test_invoke) {
     expected = chef_solo_run_list
     find_and_execute_task("chef-solo")
-    assert_run_list(expected)
+    assert_host_run_list(expected + %w(role[web] role[app] role[db]))
     _test_recipes(expected)
   }
 
   task(:test_run_list) {
     expected = %w(recipe[baz])
     chef_solo.run_list expected
-#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
+#   assert_host_run_list(expected + %w(role[web] role[app] role[db])) # arguments of chef_solo.run_list will not be written to attributes file
     _test_recipes(expected)
   }
 }
@@ -228,14 +259,14 @@ namespace(:test_with_local_cookbooks) {
   task(:test_invoke) {
     expected = chef_solo_run_list
     find_and_execute_task("chef-solo")
-    assert_run_list(expected)
+    assert_host_run_list(expected + %w(role[web] role[app] role[db]))
     _test_recipes(expected)
   }
 
   task(:test_run_list) {
     expected = %w(recipe[baz])
     chef_solo.run_list expected
-#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
+#   assert_host_run_list(expected + %w(role[web] role[app] role[db])) # arguments of chef_solo.run_list will not be written to attributes file
     _test_recipes(expected)
   }
 }
@@ -269,14 +300,14 @@ namespace(:test_with_remote_cookbooks) {
   task(:test_invoke) {
     expected = chef_solo_run_list
     find_and_execute_task("chef-solo")
-    assert_run_list(expected)
+    assert_host_run_list(expected + %w(role[web] role[app] role[db]))
     _test_recipes(expected)
   }
 
   task(:test_run_list) {
     expected = %w(recipe[three])
     chef_solo.run_list expected
-#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
+#   assert_host_run_list(expected + %w(role[web] role[app] role[db])) # arguments of chef_solo.run_list will not be written to attributes file
     _test_recipes(expected)
   }
 }
@@ -340,14 +371,14 @@ namespace(:test_with_multiple_cookbooks) {
   task(:test_invoke) {
     expected = chef_solo_run_list
     find_and_execute_task("chef-solo")
-    assert_run_list(expected)
+    assert_host_run_list(expected + %w(role[web] role[app] role[db]))
     _test_recipes(expected)
   }
 
   task(:test_run_list) {
     expected = %w(recipe[foo] recipe[single] recipe[one])
     chef_solo.run_list expected
-#   assert_run_list(expected) # arguments of chef_solo.run_list will not be written to attributes file
+#   assert_host_run_list(expected + %w(role[web] role[app] role[db])) # arguments of chef_solo.run_list will not be written to attributes file
     _test_recipes(expected)
   }
 }
