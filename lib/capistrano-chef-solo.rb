@@ -378,7 +378,7 @@ module Capistrano
             variables[:scm] = fetch("chef_solo_#{plural}_scm".to_sym) if exists?("chef_solo_#{plural}_scm".to_sym)
             variables[:deploy_subdir] = fetch("chef_solo_#{plural}_subdir".to_sym, File.join("config", plural))
             variables[:repository] = fetch("chef_solo_#{plural}_repository".to_sym) if exists?("chef_solo_#{plural}_repository".to_sym)
-            variables[:revision] = fetch("chef_solo_#{plural}_revision".to_sym) if exists?("chef_solo_#{plural}_revision".to_sym)
+            variables[:revision] = variables[:branch] = fetch("chef_solo_#{plural}_revision".to_sym) if exists?("chef_solo_#{plural}_revision".to_sym)
             if exists?("chef_solo_#{singular}_name".to_sym)
               name = fetch("chef_solo_#{singular}_name".to_sym) # deploy as single cookbook
               variables["#{singular}_name".to_sym] = name
